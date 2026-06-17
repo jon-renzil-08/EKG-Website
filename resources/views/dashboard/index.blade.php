@@ -198,17 +198,6 @@
                     Selamat Datang di Dashboard EKG
                 </h2>
                 <!-- <p class="mb-0 opacity-75">Sistem Monitoring Elektrokardiogram - Rumah Sakit</p> -->
-                <div class="quick-actions">
-                    <a href="#" class="quick-action-btn">
-                        <i class="fas fa-plus me-2"></i>Pasien Baru
-                    </a>
-                    <a href="#" class="quick-action-btn">
-                        <i class="fas fa-chart-line me-2"></i>Analisis EKG
-                    </a>
-                    <a href="#" class="quick-action-btn">
-                        <i class="fas fa-file-medical me-2"></i>Laporan
-                    </a>
-                </div>
             </div>
             <div class="col-md-4 text-end">
                 <i class="fas fa-hospital fa-5x opacity-50"></i>
@@ -301,9 +290,7 @@
                 </h5>
                 <div style="height: 300px; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); border-radius: 10px; display: flex; align-items: center; justify-content: center;">
                     <div class="text-center">
-                        <i class="fas fa-chart-line fa-3x text-muted mb-3"></i>
-                        <p class="text-muted">Grafik EKG akan ditampilkan di sini</p>
-                        <small class="text-muted">Gunakan Chart.js atau library grafik lainnya</small>
+                        <canvas id="ekgChart"></canvas>
                     </div>
                 </div>
             </div>
@@ -316,42 +303,21 @@
                     Aktivitas Terbaru
                 </h5>
                 <div class="recent-patients">
+                    @foreach($latestEkgs as $ekg)
                     <div class="activity-item">
                         <div class="d-flex justify-content-between">
                             <div>
                                 <strong>EKG Selesai</strong>
-                                <p class="mb-0 text-muted small">Pasien: John Doe</p>
+                                <p class="mb-0 text-muted small">
+                                    Pasien: {{ $ekg->patient->name ?? '-' }}
+                                </p>
                             </div>
-                            <small class="text-muted">2 menit lalu</small>
+                            <small class="text-muted">
+                                {{ $ekg->created_at->diffForHumans() }}
+                            </small>
                         </div>
                     </div>
-                    <div class="activity-item">
-                        <div class="d-flex justify-content-between">
-                            <div>
-                                <strong>Pasien Baru</strong>
-                                <p class="mb-0 text-muted small">Jane Smith terdaftar</p>
-                            </div>
-                            <small class="text-muted">15 menit lalu</small>
-                        </div>
-                    </div>
-                    <div class="activity-item">
-                        <div class="d-flex justify-content-between">
-                            <div>
-                                <strong>Laporan Generated</strong>
-                                <p class="mb-0 text-muted small">Laporan bulanan EKG</p>
-                            </div>
-                            <small class="text-muted">1 jam lalu</small>
-                        </div>
-                    </div>
-                    <div class="activity-item">
-                        <div class="d-flex justify-content-between">
-                            <div>
-                                <strong>Sistem Update</strong>
-                                <p class="mb-0 text-muted small">Versi 2.1.0 installed</p>
-                            </div>
-                            <small class="text-muted">3 jam lalu</small>
-                        </div>
-                    </div>
+                    @endforeach
                 </div>
             </div>
         </div>
@@ -366,30 +332,32 @@
                         <i class="fas fa-users me-2 text-info"></i>
                         Pasien Terbaru
                     </h5>
-                    <a href="#" class="btn btn-outline-primary btn-sm">
-                        <i class="fas fa-eye me-1"></i>Lihat Semua
-                    </a>
                 </div>
                 <div class="row">
-                    @for($i = 1; $i <= 6; $i++)
+                    @foreach($recentPatients as $patient)
                     <div class="col-md-4 mb-3">
                         <div class="patient-item">
                             <div class="patient-avatar">
-                                {{ chr(64 + $i) }}
+                                {{ strtoupper(substr($patient->name,0,1)) }}
                             </div>
+
                             <div class="flex-grow-1">
-                                <strong>Pasien {{ $i }}</strong>
+                                <strong>{{ $patient->name }}</strong>
+
                                 <p class="mb-0 text-muted small">
                                     <i class="fas fa-calendar me-1"></i>
-                                    {{ now()->subDays($i)->format('d M Y') }}
+                                    {{ $patient->created_at->format('d M Y') }}
                                 </p>
                             </div>
+
                             <div class="text-end">
-                                <span class="badge bg-success">Selesai</span>
+                                <span class="badge bg-success">
+                                    {{ $patient->ekgResults()->count() }} EKG
+                                </span>
                             </div>
                         </div>
                     </div>
-                    @endfor
+                    @endforeach
                 </div>
             </div>
         </div>
@@ -418,6 +386,25 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }, 20);
     });
+});
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+const ctx = document.getElementById('ekgChart');
+
+new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: @json(collect($monthlyEkg)->pluck('month')),
+        datasets: [{
+            label: 'Jumlah EKG',
+            data: @json(collect($monthlyEkg)->pluck('total')),
+            borderWidth: 2,
+            tension: 0.4,
+            fill: true
+        }]
+    }
 });
 </script>
 @endsection

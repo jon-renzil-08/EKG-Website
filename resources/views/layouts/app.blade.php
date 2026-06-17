@@ -90,19 +90,12 @@
                                 Daftar EKG Pasien
                             </a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link {{ request()->routeIs('jumbotron.*') ? 'active' : '' }}" 
-                            href="{{ route('jumbotron.index') }}">
-                                <i class="fas fa-image me-2"></i>
-                                Jumbotron
-                            </a>
-                        </li>
-                        <li class="nav-item">
+                        {{-- <li class="nav-item">
                             <a class="nav-link {{ request()->routeIs('oximonitor.*') ? 'active' : '' }}" 
                             href="{{ route('oximonitor.index') }}">
                                 <i class="fas fa-desktop me-2"></i>
                                 Oximonitor
-                            </a>
+                            </a> --}}
                         </li>
                     </ul>
                 </div>
