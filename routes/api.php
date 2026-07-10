@@ -45,7 +45,7 @@ Route::post('/ecg-result', function (Request $request) {
     $examName = $request->input('exam_name');
     $studyDate = $request->input('study_date');
 
-    $filename = now()->format('Ymd_His') . '_' . Str::slug($examName ?? 'ecg') . '_' . Str::random(6) . '.pdf';
+    $filename = now()->format('Ymd_His') . '' . Str::slug($examName ?? 'ecg') . '' . Str::random(6) . '.pdf';
     $path = $pdf->storeAs('public/ecg-results', $filename);
 
     EkgResult::create([
@@ -64,19 +64,19 @@ Route::post('areaList', function (Request $request) {
         "errorText" => "",
         "data" => [
             [
-                "INPA_AREA_ID" =>  "1009",  
+                "INPA_AREA_ID" =>  "1009",
                 "INPA_AREA_NAME" =>  "Pediatric  Ward",
                 "INPA_AREA_NAME_EN" =>  "Pediatric  Ward",
                 "INPA_AREA_ADDRESS" =>  "2nd Floor of Building 2",
                 "ADD_STATE" =>  2
             ],
             [
-                "INPA_AREA_ID" =>  "1010",  
+                "INPA_AREA_ID" =>  "1010",
                 "INPA_AREA_NAME" =>  "Pediatric  Ward",
                 "INPA_AREA_NAME_EN" =>  "Pediatric  Ward",
                 "INPA_AREA_ADDRESS" =>  "3rd Floor of Building 2",
                 "ADD_STATE" =>  2
-            ]  
+            ]
         ]
     ]);
 });
