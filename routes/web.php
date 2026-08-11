@@ -3,6 +3,7 @@
 use App\Events\HeartRateUpdated;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\EcgReportController;
 use App\Http\Controllers\PatientController;
 use App\Http\Controllers\EkgController;
 use App\Http\Controllers\JumbotronController;
@@ -45,7 +46,7 @@ Route::post('/send-to-worklist/{id}', function (Request $request, $id) {
             'error' => $response->body()
         ], $response->status());
     }
-    
+
     return response()->json(['success' => true]);
 });
 
@@ -53,3 +54,5 @@ Route::get('/test-heart', function () {
     broadcast(new HeartRateUpdated(rand(60, 100)));
     return "broadcast sent";
 });
+
+

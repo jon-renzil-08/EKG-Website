@@ -6,6 +6,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.1",
+        "barryvdh/laravel-dompdf": "^3.1",
         "darkaonline/l5-swagger": "^8.6",
         "firebase/php-jwt": "^6.11",
         "guzzlehttp/guzzle": "^7.2",
@@ -13,7 +14,11 @@
         "laravel/reverb": "^1.6",
         "laravel/sanctum": "^3.3",
         "laravel/tinker": "^2.8",
+        "setasign/fpdf": "^1.9",
+        "setasign/fpdi": "^2.6",
+        "smalot/pdfparser": "^2.12",
         "spatie/laravel-translation-loader": "^2.8",
+        "tecnickcom/tc-lib-barcode": "*",
         "tymon/jwt-auth": "^2.2"
     },
     "require-dev": {

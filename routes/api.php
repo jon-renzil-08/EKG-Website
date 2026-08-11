@@ -2,6 +2,7 @@
 
 use App\Events\HeartRateUpdated;
 use App\Http\Controllers\Api\WorklistController;
+use App\Http\Controllers\EkgController;
 use App\Models\EkgResult;
 use App\Models\Patient;
 use Illuminate\Http\Request;
@@ -94,3 +95,9 @@ Route::post('/iotdataupload', function (Request $request) {
 
     return response("OK", 200);
 });
+
+
+
+Route::post('/receive', [EkgController::class, 'receive']);
+Route::post('/query', [EkgController::class, 'query']);
+
