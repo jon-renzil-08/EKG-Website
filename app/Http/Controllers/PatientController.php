@@ -7,9 +7,21 @@ use Illuminate\Http\Request;
 
 class PatientController extends Controller
 {
-    public function index()
+
+    public function index(Request $request)
     {
-        $patients = Patient::all();
+        $query = Patient::query();
+
+        if ($request->has('search') && $request->search != '') {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'LIKE', "%{$search}%")
+                    ->orWhere('patient_code', 'LIKE', "%{$search}%");
+            });
+        }
+
+        $patients = $query->latest()->paginate(10)->appends(request()->query());
+
         return view('patients.index', compact('patients'));
     }
 
@@ -46,6 +58,7 @@ class PatientController extends Controller
 
     public function edit(Patient $patient)
     {
+        $patient = Patient::findOrFail($patient->id);
         return view('patients.edit', compact('patient'));
     }
 
