@@ -412,8 +412,7 @@
         <div class="sidebar-menu">
             <p class="sidebar-label">Main Menu</p>
 
-            <a class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}"
-                href="{{ route('dashboard') }}">
+            <a class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}" href="{{ route('dashboard') }}">
                 <span class="nav-icon">
                     <i class="fas fa-chart-pie"></i>
                 </span>
@@ -428,8 +427,7 @@
                 Daftar Pasien
             </a>
 
-            <a class="nav-link {{ request()->routeIs('ekg.*') ? 'active' : '' }}"
-                href="{{ route('ekg.index') }}">
+            <a class="nav-link {{ request()->routeIs('ekg.*') ? 'active' : '' }}" href="{{ route('ekg.index') }}">
                 <span class="nav-icon">
                     <i class="fas fa-heartbeat"></i>
                 </span>
@@ -456,7 +454,8 @@
                 </h6>
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb mb-0">
-                        <li class="breadcrumb-item"><a href="{{ route('dashboard') }}" style="color: #1a3a8f; font-size: 0.78rem;">Home</a></li>
+                        <li class="breadcrumb-item"><a href="{{ route('dashboard') }}"
+                                style="color: #1a3a8f; font-size: 0.78rem;">Home</a></li>
                         <li class="breadcrumb-item active">@yield('page-title', 'Dashboard')</li>
                     </ol>
                 </nav>
@@ -476,39 +475,39 @@
 
         <!-- CONTENT -->
         <div class="content-area">
-            @if(session('success'))
-            <script>
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Berhasil!',
-                    text: '{{ session('
-                    success ') }}',
-                    timer: 3000,
-                    timerProgressBar: true,
-                    showConfirmButton: false,
-                    toast: true,
-                    position: 'top-end',
-                });
-            </script>
+
+            @if (session('success'))
+                <script>
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Berhasil!',
+                        text: @json(session('success')),
+                        timer: 3000,
+                        timerProgressBar: true,
+                        showConfirmButton: false,
+                        toast: true,
+                        position: 'top-end',
+                    });
+                </script>
             @endif
 
-            @if(session('error'))
-            <script>
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Gagal!',
-                    text: '{{ session('
-                    error ') }}',
-                    timer: 3000,
-                    timerProgressBar: true,
-                    showConfirmButton: false,
-                    toast: true,
-                    position: 'top-end',
-                });
-            </script>
+            @if (session('error'))
+                <script>
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Gagal!',
+                        text: @json(session('error')),
+                        timer: 3000,
+                        timerProgressBar: true,
+                        showConfirmButton: false,
+                        toast: true,
+                        position: 'top-end',
+                    });
+                </script>
             @endif
 
             @yield('content')
+
         </div>
 
     </div>
