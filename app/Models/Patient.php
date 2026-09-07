@@ -18,7 +18,9 @@ class Patient extends Model
         'age',
         'gender',
         'pacemaker',
-        'source'
+        'source',
+        'patient_code',
+        'isInWorklist',
     ];
 
 

@@ -44,7 +44,7 @@
 							<tbody>
 								@forelse($ekgResults as $ekg)
 								<tr>
-									<td>{{ $loop->iteration }}</td>
+									<td>{{ ($ekgResults->currentPage() - 1) * $ekgResults->perPage() + $loop->iteration }}</td>
 									<td>{{ $ekg->patient->patient_code }}</td>
 									<td>{{ $ekg->patient->name }}</td>
 									<td>{{ $ekg->patient->age }}</td>
