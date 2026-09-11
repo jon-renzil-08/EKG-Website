@@ -94,7 +94,7 @@ Ikuti langkah berikut untuk melakukan instalasi project Dawei Website pada kompu
 Clone project dari repository Git menggunakan perintah:
 
 ```bash
-git clone <REPOSITORY_URL>
+git clone https://github.com/Aktivo-Dawei/Dawei-Website.git
 ```
 
 Setelah proses clone selesai, project akan tersimpan di folder:
