@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\EkgResult;
 use App\Models\Patient;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
@@ -54,20 +55,22 @@ class EkgController extends Controller
         return redirect()->route('ekg.index')->with('success', 'EKG result created successfully');
     }
 
-    public function download($id)
-    {
-        $ekgResult = EkgResult::findOrFail($id);
+    // Di EkgController
+public function download($instanceId)
+{
+    $response = Http::get(
+        "http://127.0.0.1:8042/instances/{$instanceId}/pdf"
+    );
 
-        $relativePath = preg_replace('/^public\//', '', $ekgResult->result_file_path);
-
-        $filePath = storage_path('app/public/' . $relativePath);
-
-        if (file_exists($filePath)) {
-            return response()->download($filePath);
-        }
-
-        abort(404, 'File not found');
+    if (!$response->successful()) {
+        abort(404, 'PDF tidak ditemukan di Orthanc.');
     }
+
+    return response($response->body(), 200, [
+        'Content-Type' => 'application/pdf',
+        'Content-Disposition' => 'attachment; filename="hasil_ekg.pdf"',
+    ]);
+}
 
     public function destroy(EkgResult $ekgResult)
     {

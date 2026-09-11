@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class EkgResult extends Model
@@ -13,7 +14,8 @@ class EkgResult extends Model
     protected $fillable = [
         'patient_id',
         'result_file_path',
-        'examination_date'
+        'examination_date',
+        'orthanc_instance_id',
     ];
 
     protected $casts = [
@@ -30,7 +32,7 @@ class EkgResult extends Model
         static::deleting(function ($ekg) {
             if (Storage::exists($ekg->result_file_path)) {
                 Storage::delete($ekg->result_file_path);
-                \Log::info('Deleted EKG file: ' . $ekg->result_file_path);
+                Log::info('Deleted EKG file: ' . $ekg->result_file_path);
             }
         });
     }

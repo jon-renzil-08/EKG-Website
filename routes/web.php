@@ -8,6 +8,7 @@ use App\Http\Controllers\PatientController;
 use App\Http\Controllers\EkgController;
 use App\Http\Controllers\JumbotronController;
 use App\Http\Controllers\OximonitorController;
+use App\Models\EkgResult;
 use App\Models\Patient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -26,7 +27,31 @@ Route::resource('ekg', EkgController::class);
 Route::resource('oximonitor', OximonitorController::class)->only(['index']);
 
 // Routes for download EKG result
-Route::get('/ekg/download/{id}', [EkgController::class, 'download'])->name('ekg.download');
+// Route::get('/ekg/download/{id}', [EkgController::class, 'download'])->name('ekg.download');
+
+Route::get('/ekg/download/{id}', function($id) {
+    $ekg = EkgResult::findOrFail($id);
+
+    if (!$ekg->orthanc_instance_id) {
+        // Fallback ke file storage
+        return response()->download(
+            storage_path('app/' . $ekg->result_file_path)
+        );
+    }
+
+    $response = Http::get(
+        "http://127.0.0.1:8042/instances/{$ekg->orthanc_instance_id}/pdf"
+    );
+
+    if (!$response->successful()) {
+        abort(404, 'PDF tidak ditemukan di Orthanc.');
+    }
+
+    return response($response->body(), 200, [
+        'Content-Type'        => 'application/pdf',
+        'Content-Disposition' => 'attachment; filename="hasil_ekg.pdf"',
+    ]);
+})->name('ekg.download');
 
 // Routes for Jumbotron
 Route::get('/jumbotron/', [JumbotronController::class, 'index'])->name('jumbotron.index');

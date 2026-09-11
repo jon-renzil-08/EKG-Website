@@ -95,6 +95,7 @@ Route::post('/ecg-result', function (Request $request) {
         'patient_id'       => $patient->id, // ← pakai integer id, bukan patient_code
         'result_file_path' => $path,
         'examination_date' => now(),
+        'orthanc_instance_id' => $request->input('orthanc_instance_id'),
     ]);
 
     // Reset isInWorklist to 0 after storing the result

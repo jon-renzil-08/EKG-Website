@@ -49,7 +49,7 @@
 								@forelse($patients as $patient)
 								<tr class="patient-row">
 									<td>{{ ($patients->currentPage() - 1) * $patients->perPage() + $loop->iteration }}</td>
-									<td>{{ $patient->patient_code }}</td>
+									<td style="font-weight: bold;">{{ $patient->patient_code }}</td>
 									<td>{{ $patient->name }}</td>
 									<td>{{ $patient->age }}</td>
 									<td>
