@@ -97,12 +97,6 @@ Clone project dari repository Git menggunakan perintah:
 git clone https://github.com/Aktivo-Dawei/Dawei-Website.git
 ```
 
-Setelah proses clone selesai, project akan tersimpan di folder:
-
-```text
-Dawei-Website
-```
-
 ### 2.2 Masuk ke Folder Project
 
 Masuk ke folder project menggunakan command:
