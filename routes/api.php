@@ -1,6 +1,5 @@
 <?php
 
-use App\Events\HeartRateUpdated;
 use App\Http\Controllers\Api\WorklistController;
 use App\Models\EkgResult;
 use App\Models\Patient;
@@ -88,19 +87,19 @@ Route::post('/ecg-result', function (Request $request) {
         return response()->json(['status' => 'error', 'message' => 'Patient not found'], 404);
     }
 
-    $filename = now()->format('Ymd_His') . Str::slug($examName ?? 'ecg') . Str::random(6) . '.pdf';
+    $filename = 'Aktivo_' . now()->format('Ymd_His') . '_' . Str::slug($examName ?? 'ecg') . '_' . Str::random(6) . '.pdf';
     $path     = $pdf->storeAs('public/ecg-results', $filename);
 
     EkgResult::create([
-        'patient_id'       => $patient->id, // ← pakai integer id, bukan patient_code
-        'result_file_path' => $path,
-        'examination_date' => now(),
+        'patient_id'          => $patient->id, // ← pakai integer id, bukan patient_code
+        'result_file_path'    => $path,
+        'examination_date'    => now(),
         'orthanc_instance_id' => $request->input('orthanc_instance_id'),
     ]);
 
-    // Reset isInWorklist to 0 after storing the result
-    $updated = $patient->update(['isInWorklist' => 0]);
-    Log::info('Reset isInWorklist for patient ' . $patient->patient_code . ': ' . ($updated ? 'success' : 'failed'));
+    // Update isInWorklist to 2 (selesai) after storing the result
+    $updated = $patient->update(['isInWorklist' => 2]);
+    Log::info('Update isInWorklist to 2 (selesai) for patient ' . $patient->patient_code . ': ' . ($updated ? 'success' : 'failed'));
 
     // Hapus file .wl
     $wlPattern = "C:\\Orthanc\\Worklists\\{$patient->patient_code}_*.wl";
@@ -115,6 +114,35 @@ Route::post('/ecg-result', function (Request $request) {
 
     return response()->json(['status' => 'ok', 'message' => 'Result stored', 'filename' => $filename]);
 });
+
+
+
+Route::get('/check-new-ekg', function (Request $request) {
+    $lastId = $request->query('last_id', 0);
+
+    $newResults = EkgResult::with('patient')
+        ->where('id', '>', $lastId)
+        ->latest()
+        ->get()
+        ->map(function($ekg) {
+            return [
+                'ekg_id'       => $ekg->id,
+                'patient_name' => $ekg->patient->name ?? 'Unknown',
+                'patient_code' => $ekg->patient->patient_code ?? '-',
+                'exam_date'    => $ekg->examination_date,
+            ];
+        });
+
+    return response()->json([
+        'new_results' => $newResults,
+        'last_id'     => $newResults->max('ekg_id') ?? $lastId,
+    ]);
+});
+
+
+
+
+
 
 // Routes for areaList //
 // Route::post('areaList', function (Request $request) {

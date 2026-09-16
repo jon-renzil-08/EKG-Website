@@ -10,6 +10,7 @@ use App\Http\Controllers\JumbotronController;
 use App\Http\Controllers\OximonitorController;
 use App\Models\EkgResult;
 use App\Models\Patient;
+use App\Services\EcgPdfEnhancer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 
@@ -29,28 +30,35 @@ Route::resource('oximonitor', OximonitorController::class)->only(['index']);
 // Routes for download EKG result
 // Route::get('/ekg/download/{id}', [EkgController::class, 'download'])->name('ekg.download');
 
+
+
 Route::get('/ekg/download/{id}', function($id) {
     $ekg = EkgResult::findOrFail($id);
 
-    if (!$ekg->orthanc_instance_id) {
-        // Fallback ke file storage
-        return response()->download(
-            storage_path('app/' . $ekg->result_file_path)
-        );
+    $pdfPath = storage_path('app/' . $ekg->result_file_path);
+
+    if (!file_exists($pdfPath)) {
+        abort(404, 'File tidak ditemukan.');
     }
 
-    $response = Http::get(
-        "http://127.0.0.1:8042/instances/{$ekg->orthanc_instance_id}/pdf"
-    );
+    // Ambil data pasien
+    $patient = Patient::find($ekg->patient_id);
 
-    if (!$response->successful()) {
-        abort(404, 'PDF tidak ditemukan di Orthanc.');
-    }
+    // Format nama file: AKTIVO_EKG_P0001_Johni_Revormasi_Ziliwu.pdf
+    $patientId   = $patient ? $patient->patient_code : 'unknown';
+    $patientName = $patient ? str_replace(' ', '_', $patient->name) : 'unknown';
+    $fileName    = "AKTIVO_EKG_{$patientId}_{$patientName}.pdf";
 
-    return response($response->body(), 200, [
-        'Content-Type'        => 'application/pdf',
-        'Content-Disposition' => 'attachment; filename="hasil_ekg.pdf"',
-    ]);
+    // Enhance PDF
+    $enhancer    = new EcgPdfEnhancer();
+    $enhancedPath = $enhancer->enhance($pdfPath);
+
+    return response()->download(
+        $enhancedPath,
+        $fileName,
+        ['Content-Type' => 'application/pdf']
+    )->deleteFileAfterSend(true);
+
 })->name('ekg.download');
 
 // Routes for Jumbotron

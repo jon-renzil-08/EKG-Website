@@ -16,14 +16,16 @@
                         {{-- NAME --}}
                         <div class="mb-3">
                             <label for="name" class="form-label">Name <span class="text-danger">*</span></label>
-                            <input type="text" name="name" class="form-control" id="name" required>
+                            <input type="text" name="name" class="form-control" id="name" required placeholder="Inputkan Nama Pasien">
                         </div>
 
                         {{-- AGE --}}
                         <div class="mb-3">
                             <label for="age" class="form-label">Age <span class="text-danger">*</span></label>
-                            <input type="number" name="age" class="form-control" id="age" min="1" max="120" required>
+                            <input type="number" name="age" class="form-control" id="age" min="1" max="120" required placeholder="Inputkan Umur Pasien">
                         </div>
+
+                        
 
                         {{-- GENDER --}}
                         <div class="mb-3">
@@ -77,3 +79,6 @@
     </div>
 </div>
 @endsection
+
+
+

@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('patients', function (Blueprint $table) {
             //
-            $table->boolean('isInWorklist')->default(false);
+           $table->tinyInteger('isInWorklist')->default(0);
         });
     }
 

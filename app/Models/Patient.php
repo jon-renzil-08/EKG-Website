@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,11 +10,10 @@ class Patient extends Model
 {
     use HasFactory;
 
-
-
     protected $fillable = [
         'name',
         'age',
+        'height',
         'gender',
         'pacemaker',
         'source',
@@ -23,16 +21,19 @@ class Patient extends Model
         'isInWorklist',
     ];
 
-
-
-
     protected static function booted()
     {
         // Auto generate patient code
-
         static::creating(function ($patient) {
-            $last = Patient::max('id') ?? 0;
-            $patient->patient_code = 'P' . str_pad($last + 1, 4, '0', STR_PAD_LEFT);
+            // Ambil nomor urut terakhir
+            $last   = Patient::max('id') ?? 0;
+            $number = str_pad($last + 1, 5, '0', STR_PAD_LEFT);
+
+            // Format: 00001-MM-YYYY
+            $month = now()->format('m');
+            $year  = now()->format('Y');
+
+            $patient->patient_code = $number . '-' . $month . '-' . $year;
         });
 
         // Auto delete file PDF

@@ -56,21 +56,21 @@ class EkgController extends Controller
     }
 
     // Di EkgController
-public function download($instanceId)
-{
-    $response = Http::get(
-        "http://127.0.0.1:8042/instances/{$instanceId}/pdf"
-    );
+// public function download($instanceId)
+// {
+//     $response = Http::get(
+//         "http://127.0.0.1:8042/instances/{$instanceId}/pdf"
+//     );
 
-    if (!$response->successful()) {
-        abort(404, 'PDF tidak ditemukan di Orthanc.');
-    }
+//     if (!$response->successful()) {
+//         abort(404, 'PDF tidak ditemukan di Orthanc.');
+//     }
 
-    return response($response->body(), 200, [
-        'Content-Type' => 'application/pdf',
-        'Content-Disposition' => 'attachment; filename="hasil_ekg.pdf"',
-    ]);
-}
+//     return response($response->body(), 200, [
+//         'Content-Type' => 'application/pdf',
+//         'Content-Disposition' => 'attachment; filename="hasil_ekg.pdf"',
+//     ]);
+// }
 
     public function destroy(EkgResult $ekgResult)
     {
