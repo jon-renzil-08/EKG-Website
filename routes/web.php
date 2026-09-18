@@ -8,6 +8,7 @@ use App\Http\Controllers\PatientController;
 use App\Http\Controllers\EkgController;
 use App\Http\Controllers\JumbotronController;
 use App\Http\Controllers\OximonitorController;
+use App\Http\Controllers\LoginController;
 use App\Models\EkgResult;
 use App\Models\Patient;
 use App\Services\EcgPdfEnhancer;
@@ -15,8 +16,18 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 
 
+// Authentication routes
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
+    Route::post('/login', [LoginController::class, 'login']);
+});
+
+Route::middleware('auth')->group(function () {
+    Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
+
+
 // Routes for the web application
-Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
 // Routes for Patients
 Route::resource('patients', PatientController::class);
@@ -98,4 +109,5 @@ Route::post('/send-to-worklist/{id}', function (Request $request, $id) {
 Route::get('/test-heart', function () {
     broadcast(new HeartRateUpdated(rand(60, 100)));
     return "broadcast sent";
+});
 });
