@@ -61,12 +61,32 @@
                                             <td>
                                                 <span class="badge bg-info">{{ $ekg->patient->source }}</span>
                                             </td>
+                                            {{-- Kolom tombol download --}}
                                             <td>
-                                                <a href="{{ route('ekg.download', $ekg->id) }}"
-                                                    class="btn btn-sm btn-success" target="_blank">
-                                                    <i class="fas fa-download me-1"></i>
-                                                    Download PDF
-                                                </a>
+                                                @if ($ekg->result_file_path)
+                                                    <a href="{{ route('ekg.download', ['id' => $ekg->id, 'type' => 'pdf']) }}"
+                                                        class="btn btn-sm btn-success" target="_blank">
+                                                        <i class="fas fa-file-pdf me-1"></i>PDF
+                                                    </a>
+                                                @endif
+
+                                                @if ($ekg->xml_file_path)
+                                                    <a href="{{ route('ekg.download', ['id' => $ekg->id, 'type' => 'xml']) }}"
+                                                        class="btn btn-sm btn-info" target="_blank">
+                                                        <i class="fas fa-file-code me-1"></i>XML
+                                                    </a>
+                                                @endif
+
+                                                @if ($ekg->dat_file_path)
+                                                    <a href="{{ route('ekg.download', ['id' => $ekg->id, 'type' => 'dat']) }}"
+                                                        class="btn btn-sm btn-warning" target="_blank">
+                                                        <i class="fas fa-file-alt me-1"></i>DAT
+                                                    </a>
+                                                @endif
+
+                                                @if (!$ekg->result_file_path && !$ekg->xml_file_path && !$ekg->dat_file_path)
+                                                    <span class="text-muted">Belum ada file</span>
+                                                @endif
                                             </td>
                                             <td>{{ $ekg->examination_date->format('d/m/Y H:i') }}</td>
                                         </tr>

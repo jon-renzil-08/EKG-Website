@@ -72,14 +72,17 @@ Route::post('/ecg-result', function (Request $request) {
         return response()->json(['status' => 'error', 'message' => 'No file uploaded'], 400);
     }
 
-    $pdf = $request->file('file');
-    if (! $pdf->isValid() || $pdf->getClientOriginalExtension() !== 'pdf') {
-        return response()->json(['status' => 'error', 'message' => 'Invalid file'], 400);
+    $uploadedFile      = $request->file('file');
+    $extension         = strtolower($uploadedFile->getClientOriginalExtension());
+    $allowedExtensions = ['pdf', 'xml', 'dat'];
+
+    if (! $uploadedFile->isValid() || ! in_array($extension, $allowedExtensions)) {
+        return response()->json(['status' => 'error', 'message' => 'Invalid file type. Only PDF, XML, and DAT are accepted.'], 400);
     }
 
-    $patientCode = $request->input('patient_id'); // ← dapat P0001 dari middleware
+    $patientCode = $request->input('patient_id');
     $examName    = $request->input('exam_name');
-    $studyDate   = $request->input('study_date');
+    $fileType    = $request->input('file_type', strtoupper($extension));
 
     $patient = Patient::where('patient_code', $patientCode)->first();
 
@@ -87,24 +90,49 @@ Route::post('/ecg-result', function (Request $request) {
         return response()->json(['status' => 'error', 'message' => 'Patient not found'], 404);
     }
 
-    $filename = 'Aktivo_' . now()->format('Ymd_His') . '_' . Str::slug($examName ?? 'ecg') . '_' . Str::random(6) . '.pdf';
-    $path     = $pdf->storeAs('public/ecg-results', $filename);
+    $filename = 'Hasil_' . now()->format('Ymd_His') . '_' . Str::slug($examName ?? 'ecg') . '_' . Str::random(6) . '.' . $extension;
+    $path     = $uploadedFile->storeAs('public/ecg-results', $filename);
 
-    EkgResult::create([
-        'patient_id'          => $patient->id, // ← pakai integer id, bukan patient_code
-        'result_file_path'    => $path,
-        'examination_date'    => now(),
-        'orthanc_instance_id' => $request->input('orthanc_instance_id'),
-    ]);
+    $columnMap = [
+        'pdf' => 'result_file_path',
+        'xml' => 'xml_file_path',
+        'dat' => 'dat_file_path',
+    ];
+    $targetColumn = $columnMap[$extension];
 
-    // Update isInWorklist to 2 (selesai) after storing the result
+    $recentWindow = now()->subSeconds(60);
+
+    $existing = EkgResult::where('patient_id', $patient->id)
+        ->where('created_at', '>=', $recentWindow)
+        ->whereNull($targetColumn)
+        ->latest()
+        ->first();
+
+    if ($existing) {
+        $updateData = [$targetColumn => $path];
+        if ($extension === 'pdf') {
+            $updateData['result_file_type'] = $fileType;
+        }
+        $existing->update($updateData);
+        $ekgResult = $existing;
+    } else {
+        $data = [
+            'patient_id'          => $patient->id,
+            'examination_date'    => now(),
+            'orthanc_instance_id' => $request->input('orthanc_instance_id'),
+            $targetColumn         => $path,
+        ];
+        if ($extension === 'pdf') {
+            $data['result_file_type'] = $fileType;
+        }
+        $ekgResult = EkgResult::create($data);
+    }
+
     $updated = $patient->update(['isInWorklist' => 2]);
     Log::info('Update isInWorklist to 2 (selesai) for patient ' . $patient->patient_code . ': ' . ($updated ? 'success' : 'failed'));
 
-    // Hapus file .wl
-    $wlPattern = "C:\\Orthanc\\Worklists\\{$patient->patient_code}_*.wl";
+    $wlPattern = "C:\\EKG-Middleware\\worklists\\{$patient->patient_code}_*.wl";
     $wlFiles   = glob($wlPattern);
-    Log::info('WL files found: ' . count($wlFiles ?? []));
     if ($wlFiles) {
         foreach ($wlFiles as $wlFile) {
             unlink($wlFile);
@@ -112,10 +140,8 @@ Route::post('/ecg-result', function (Request $request) {
         }
     }
 
-    return response()->json(['status' => 'ok', 'message' => 'Result stored', 'filename' => $filename]);
+    return response()->json(['status' => 'ok', 'message' => 'Result stored', 'filename' => $filename, 'ekg_id' => $ekgResult->id]);
 });
-
-
 
 Route::get('/check-new-ekg', function (Request $request) {
     $lastId = $request->query('last_id', 0);
@@ -124,7 +150,7 @@ Route::get('/check-new-ekg', function (Request $request) {
         ->where('id', '>', $lastId)
         ->latest()
         ->get()
-        ->map(function($ekg) {
+        ->map(function ($ekg) {
             return [
                 'ekg_id'       => $ekg->id,
                 'patient_name' => $ekg->patient->name ?? 'Unknown',
@@ -138,11 +164,6 @@ Route::get('/check-new-ekg', function (Request $request) {
         'last_id'     => $newResults->max('ekg_id') ?? $lastId,
     ]);
 });
-
-
-
-
-
 
 // Routes for areaList //
 // Route::post('areaList', function (Request $request) {

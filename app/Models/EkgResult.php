@@ -14,6 +14,9 @@ class EkgResult extends Model
     protected $fillable = [
         'patient_id',
         'result_file_path',
+        'result_file_type',
+        'xml_file_path',
+        'dat_file_path',
         'examination_date',
         'orthanc_instance_id',
     ];
@@ -24,7 +27,7 @@ class EkgResult extends Model
 
     public function patient()
     {
-        return $this->belongsTo(Patient::class);
+        return $this->belongsTo(Patient::class)->withTrashed();
     }
 
     protected static function booted()

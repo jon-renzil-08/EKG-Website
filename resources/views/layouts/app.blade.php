@@ -393,6 +393,22 @@
         .pulse-btn {
             animation: pulse 1.5s infinite;
         }
+
+
+        .logout-button {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 8px;
+            background: #dc2626;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .logout-button:hover {
+            background: #b91c1c;
+        }
     </style>
 
 </head>
@@ -433,8 +449,18 @@
                 </span>
                 Hasil EKG
             </a>
-        </div>
 
+            <div style="margin-top: 12rem; margin-left: 1rem;">
+                <form method="POST" action="{{ route('logout') }}">
+                    @csrf
+
+                    <button type="submit" class="logout-button">
+                        Logout
+                    </button>
+                </form>
+
+            </div>
+        </div>
         <div class="sidebar-footer">
             <div class="d-flex align-items-center gap-2">
                 <span class="status-dot"></span>
@@ -461,14 +487,8 @@
                 </nav>
             </div>
             <div class="topbar-right">
-                <div class="topbar-btn" title="Notifications">
-                    <i class="fas fa-bell"></i>
-                </div>
-                <div class="topbar-btn" title="Settings">
-                    <i class="fas fa-cog"></i>
-                </div>
-                <div class="topbar-avatar" title="Admin">
-                    A
+                <div class="btn btn-primary">
+                    {{ Auth::user()->name }}
                 </div>
             </div>
         </div>
