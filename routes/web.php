@@ -9,6 +9,7 @@ use App\Http\Controllers\PatientController;
 use App\Http\Controllers\EkgController;
 use App\Http\Controllers\JumbotronController;
 use App\Http\Controllers\OximonitorController;
+use App\Http\Controllers\LoginController;
 use App\Models\EkgResult;
 use App\Models\Patient;
 use App\Services\EcgPdfEnhancer;
@@ -29,8 +30,18 @@ Route::post('/logout', [AuthController::class, 'logout'])
 Route::middleware('auth')->group(function () {
 
 
-    // Routes for the web application
-    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+// Authentication routes
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
+    Route::post('/login', [LoginController::class, 'login']);
+});
+
+Route::middleware('auth')->group(function () {
+    Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
+
+
+// Routes for the web application
+Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
     // Routes for Patients
     Route::resource('patients', PatientController::class);
@@ -130,10 +141,8 @@ Route::middleware('auth')->group(function () {
         }
     });
 
-    // Routes test-heart
-    Route::get('/test-heart', function () {
-        broadcast(new HeartRateUpdated(rand(60, 100)));
-        return "broadcast sent";
-    });
+// Routes test-heart
+Route::get('/test-heart', function () {
+    broadcast(new HeartRateUpdated(rand(60, 100)));
+    return "broadcast sent";
 });
-
