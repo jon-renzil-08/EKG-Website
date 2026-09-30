@@ -29,7 +29,7 @@ Route::middleware('auth')->group(function () {
 
 
 // Routes for the web application
-Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // Routes for Patients
     Route::resource('patients', PatientController::class);
