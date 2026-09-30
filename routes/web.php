@@ -72,13 +72,13 @@ Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard
         $patientName = $patient ? str_replace(' ', '_', $patient->name) : 'unknown';
 
         if ($type === 'xml') {
-            return response()->download($filePath, "Hasil_EKG_{$patientName}_{$patientId}.xml", [
+            return response()->download($filePath, "Klinik_Shanata_{$patientName}_{$patientId}.xml", [
                 'Content-Type' => 'application/xml'
             ]);
         }
 
         if ($type === 'dat') {
-            return response()->download($filePath, "Hasil_EKG_{$patientName}_{$patientId}.dat", [
+            return response()->download($filePath, "Klinik_Shanata_{$patientName}_{$patientId}.dat", [
                 'Content-Type' => 'application/octet-stream'
             ]);
         }
@@ -89,7 +89,7 @@ Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard
 
         return response()->download(
             $enhancedPath,
-            "Hasil_EKG_{$patientName}_{$patientId}.pdf",
+            "Klinik_Shanata_{$patientName}_{$patientId}.pdf",
             ['Content-Type' => 'application/pdf']
         )->deleteFileAfterSend(true);
 
