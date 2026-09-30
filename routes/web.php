@@ -146,3 +146,7 @@ Route::get('/test-heart', function () {
     broadcast(new HeartRateUpdated(rand(60, 100)));
     return "broadcast sent";
 });
+
+});
+});
+
