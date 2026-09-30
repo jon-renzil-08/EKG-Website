@@ -77,20 +77,39 @@ Route::post('/ecg-result', function (Request $request) {
     $allowedExtensions = ['pdf', 'xml', 'dat'];
 
     if (! $uploadedFile->isValid() || ! in_array($extension, $allowedExtensions)) {
-        return response()->json(['status' => 'error', 'message' => 'Invalid file type. Only PDF, XML, and DAT are accepted.'], 400);
+        return response()->json(['status' => 'error', 'message' => 'Invalid file type.'], 400);
     }
 
     $patientCode = $request->input('patient_id');
-    $examName    = $request->input('exam_name');
-    $fileType    = $request->input('file_type', strtoupper($extension));
+    if (! $patientCode) {
+        return response()->json(['status' => 'error', 'message' => 'patient_id is required'], 400);
+    }
+
+    $examName = $request->input('exam_name');
+    $fileType = $request->input('file_type', strtoupper($extension));
+
+    $patientCode = $request->input('patient_code', $patientCode);
 
     $patient = Patient::where('patient_code', $patientCode)->first();
 
     if (! $patient) {
-        return response()->json(['status' => 'error', 'message' => 'Patient not found'], 404);
+        $genderMap = ['M' => 'Male', 'F' => 'Female'];
+        $rawSex    = strtoupper($request->input('patient_sex', ''));
+
+        $patient = Patient::create([
+            'patient_code' => $patientCode,
+            'name'         => $request->input('patient_name', 'Unknown'),
+            'gender'       => $genderMap[$rawSex] ?? 'Unknown',
+            'age'          => $request->input('patient_age') ?: 0,
+            'pacemaker'    => 'No',
+            'isInWorklist' => 2,
+            'source'       => 'Outpatient',
+        ]);
+
+        Log::info("Auto-registered new patient from manual EKG entry: {$patientCode}");
     }
 
-    $filename = 'Hasil_' . now()->format('Ymd_His') . '_' . Str::slug($examName ?? 'ecg') . '_' . Str::random(6) . '.' . $extension;
+    $filename = 'Aktivo_' . now()->format('Ymd_His') . '_' . Str::slug($examName ?? 'ecg') . '_' . Str::random(6) . '.' . $extension;
     $path     = $uploadedFile->storeAs('public/ecg-results', $filename);
 
     $columnMap = [
@@ -130,15 +149,6 @@ Route::post('/ecg-result', function (Request $request) {
 
     $updated = $patient->update(['isInWorklist' => 2]);
     Log::info('Update isInWorklist to 2 (selesai) for patient ' . $patient->patient_code . ': ' . ($updated ? 'success' : 'failed'));
-
-    $wlPattern = "C:\\EKG-Middleware\\worklists\\{$patient->patient_code}_*.wl";
-    $wlFiles   = glob($wlPattern);
-    if ($wlFiles) {
-        foreach ($wlFiles as $wlFile) {
-            unlink($wlFile);
-            Log::info("Deleted worklist file: {$wlFile}");
-        }
-    }
 
     return response()->json(['status' => 'ok', 'message' => 'Result stored', 'filename' => $filename, 'ekg_id' => $ekgResult->id]);
 });

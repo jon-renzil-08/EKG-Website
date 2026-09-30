@@ -533,6 +533,78 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let lastEkgId = {{ \App\Models\EkgResult::latest()->first()?->id ?? 0 }};
+
+        // Cek setiap 10 detik
+        setInterval(function() {
+            fetch(`/api/check-new-ekg?last_id=${lastEkgId}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.new_results && data.new_results.length > 0) {
+                        data.new_results.forEach(function(result) {
+                            showEkgNotification(result.patient_name, result.patient_code);
+                            lastEkgId = result.ekg_id;
+                        });
+                    }
+                })
+                .catch(err => console.log('Polling error:', err));
+        }, 10000); // 10 detik
+
+        function showEkgNotification(patientName, patientId) {
+            // Hapus toast lama kalau ada
+            const oldToast = document.getElementById('ekgToast');
+            if (oldToast) oldToast.remove();
+
+            // Buat toast baru
+            const toastHtml = `
+            <div id="ekgToast"
+                class="toast align-items-center text-white bg-success border-0 show"
+                role="alert"
+                style="position:fixed; top:20px; right:20px; z-index:9999; min-width:320px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+                <div class="d-flex">
+                    <div class="toast-body">
+                        <i class="fas fa-heartbeat me-2"></i>
+                        <b>Hasil EKG Masuk!</b><br>
+                        Pasien: <b>${patientName}</b><br>
+                        ID: <b>${patientId}</b><br>
+                        <small class="text-white-50">${new Date().toLocaleTimeString()}</small>
+                    </div>
+                    <button type="button"
+                        class="btn-close btn-close-white me-2 m-auto"
+                        onclick="document.getElementById('ekgToast').remove()">
+                    </button>
+                </div>
+            </div>
+        `;
+
+            document.body.insertAdjacentHTML('beforeend', toastHtml);
+
+            // Auto hilang setelah 8 detik
+            setTimeout(() => {
+                const toast = document.getElementById('ekgToast');
+                if (toast) toast.remove();
+            }, 8000);
+
+            // Browser notification
+            if (Notification.permission === 'granted') {
+                new Notification('🔔 Hasil EKG Masuk!', {
+                    body: `Pasien ${patientName} (${patientId}) sudah selesai EKG`,
+                    icon: '/favicon.ico'
+                });
+            }
+
+            // Reload tabel pasien
+            setTimeout(() => location.reload(), 3000);
+        }
+
+        // Minta izin browser notification
+        document.addEventListener('DOMContentLoaded', function() {
+            if (Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+        });
+    </script>
     @stack('scripts')
 </body>
 

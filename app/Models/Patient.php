@@ -5,6 +5,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+
 class Patient extends Model
 {
     use HasFactory;
@@ -24,6 +25,10 @@ class Patient extends Model
     protected static function booted()
     {
         static::creating(function ($patient) {
+            if (!empty($patient->patient_code)) {
+                return;
+            }
+
             $month  = now()->format('m');
             $year   = now()->format('Y');
             $suffix = $month . '-' . $year;
