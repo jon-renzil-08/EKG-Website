@@ -45,29 +45,13 @@
                                 </thead>
                                 <tbody id="patientTable">
                                     @forelse($patients as $patient)
-                                        @php
-                                            $generator = new \Picqer\Barcode\BarcodeGeneratorPNG();
-                                            $barcode = base64_encode(
-                                                $generator->getBarcode(
-                                                    $patient->patient_code,
-                                                    \Picqer\Barcode\BarcodeGeneratorPNG::TYPE_CODE_128,
-                                                ),
-                                            );
-                                        @endphp
                                         <tr class="patient-row">
                                             <td>{{ ($patients->currentPage() - 1) * $patients->perPage() + $loop->iteration }}
                                             </td>
                                             {{-- <td style="font-weight: bold;">{{ $patient->patient_code }}</td> --}}
 
-                                            <td>
-                                                <div style="background: white; padding: 5px; display: inline-block;">
-                                                    <img src="data:image/png;base64,{{ $barcode }}"
-                                                        style="width: 200px; height: 60px; display: block;">
-
-                                                    <small style="display: block; text-align: center; margin-top: 5px;">
-                                                        ID : {{ $patient->patient_code }}
-                                                    </small>
-                                                </div>
+                                            <td style="font-weight: bold; color: black;">
+                                            {{ $patient->patient_code }}
                                             </td>
                                             <td>{{ $patient->name }}</td>
                                             <td>{{ $patient->age }}</td>
