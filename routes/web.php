@@ -14,6 +14,10 @@ use App\Services\EcgPdfEnhancer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/', function () {
+    return redirect()->route('login');
+});
+
 Route::get('/login', [AuthController::class, 'showLogin'])
     ->name('login');
 
