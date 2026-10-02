@@ -9,32 +9,32 @@
         transition: transform 0.3s ease, box-shadow 0.3s ease;
         overflow: hidden;
     }
-    
+
     .dashboard-card:hover {
         transform: translateY(-5px);
         box-shadow: 0 8px 30px rgba(0,0,0,0.15);
     }
-    
+
     .gradient-primary {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     }
-    
+
     .gradient-success {
         background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
     }
-    
+
     .gradient-warning {
         background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
     }
-    
+
     .gradient-info {
         background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
     }
-    
+
     .gradient-danger {
         background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
     }
-    
+
     .stat-card {
         border-radius: 15px;
         padding: 25px;
@@ -42,7 +42,7 @@
         position: relative;
         overflow: hidden;
     }
-    
+
     .stat-card::before {
         content: '';
         position: absolute;
@@ -54,24 +54,24 @@
         border-radius: 50%;
         transform: translate(30px, -30px);
     }
-    
+
     .stat-number {
         font-size: 2.5rem;
         font-weight: 700;
         margin-bottom: 5px;
     }
-    
+
     .stat-label {
         font-size: 0.95rem;
         opacity: 0.9;
         margin-bottom: 0;
     }
-    
+
     .stat-icon {
         font-size: 3rem;
         opacity: 0.8;
     }
-    
+
     .chart-card {
         background: white;
         border-radius: 15px;
@@ -79,7 +79,7 @@
         box-shadow: 0 4px 20px rgba(0,0,0,0.1);
         margin-bottom: 30px;
     }
-    
+
     .welcome-card {
         background: linear-gradient(135deg, #2a5298 0%, #2a5298 100%);
         color: white;
@@ -89,7 +89,7 @@
         position: relative;
         overflow: hidden;
     }
-    
+
     .welcome-card::before {
         content: '';
         position: absolute;
@@ -100,12 +100,12 @@
         background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 50%);
         animation: pulse 4s ease-in-out infinite;
     }
-    
+
     @keyframes pulse {
         0%, 100% { transform: scale(1); }
         50% { transform: scale(1.05); }
     }
-    
+
     .activity-item {
         padding: 15px;
         border-left: 4px solid #667eea;
@@ -114,19 +114,19 @@
         border-radius: 8px;
         transition: all 0.3s ease;
     }
-    
+
     .activity-item:hover {
         background: #e9ecef;
         transform: translateX(5px);
     }
-    
+
     .quick-actions {
         display: flex;
         gap: 15px;
         flex-wrap: wrap;
         margin-top: 20px;
     }
-    
+
     .quick-action-btn {
         background: rgba(255,255,255,0.2);
         color: white;
@@ -136,32 +136,32 @@
         transition: all 0.3s ease;
         border: 1px solid rgba(255,255,255,0.3);
     }
-    
+
     .quick-action-btn:hover {
         background: rgba(255,255,255,0.3);
         color: white;
         transform: translateY(-2px);
     }
-    
+
     .mini-chart {
         width: 100%;
         height: 60px;
         margin-top: 15px;
     }
-    
+
     .trend-up {
         color: #28a745;
     }
-    
+
     .trend-down {
         color: #dc3545;
     }
-    
+
     .recent-patients {
         max-height: 400px;
         overflow-y: auto;
     }
-    
+
     .patient-item {
         display: flex;
         align-items: center;
@@ -169,11 +169,11 @@
         border-bottom: 1px solid #eee;
         transition: background 0.3s ease;
     }
-    
+
     .patient-item:hover {
         background: #f8f9fa;
     }
-    
+
     .patient-avatar {
         width: 40px;
         height: 40px;
@@ -224,7 +224,7 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="col-xl-3 col-md-6 mb-4">
             <div class="stat-card gradient-success">
                 <div class="d-flex justify-content-between align-items-center">
@@ -242,7 +242,7 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="col-xl-3 col-md-6 mb-4">
             <div class="stat-card gradient-warning">
                 <div class="d-flex justify-content-between align-items-center">
@@ -260,7 +260,7 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="col-xl-3 col-md-6 mb-4">
             <div class="stat-card gradient-info">
                 <div class="d-flex justify-content-between align-items-center">
@@ -295,7 +295,7 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="col-xl-4">
             <div class="chart-card">
                 <h5 class="mb-3">
@@ -309,7 +309,7 @@
                             <div>
                                 <strong>EKG Selesai</strong>
                                 <p class="mb-0 text-muted small">
-                                    Pasien: {{ $ekg->patient->name ?? '-' }}
+                                    Pasien: {{ ucwords(strtolower($ekg->patient->name ?? '-')) }}
                                 </p>
                             </div>
                             <small class="text-muted">
@@ -342,8 +342,7 @@
                             </div>
 
                             <div class="flex-grow-1">
-                                <strong>{{ $patient->name }}</strong>
-
+                                <strong>{{ ucwords(strtolower($patient->name)) }}</strong>
                                 <p class="mb-0 text-muted small">
                                     <i class="fas fa-calendar me-1"></i>
                                     {{ $patient->created_at->format('d M Y') }}
@@ -368,14 +367,14 @@
 // Animasi counter untuk angka statistik
 document.addEventListener('DOMContentLoaded', function() {
     const counters = document.querySelectorAll('.stat-number');
-    
+
     counters.forEach(counter => {
         const target = parseInt(counter.textContent);
         counter.textContent = '0';
-        
+
         const increment = target / 100;
         let current = 0;
-        
+
         const timer = setInterval(() => {
             current += increment;
             if (current >= target) {

@@ -53,7 +53,7 @@
                                             <td style="font-weight: bold; color: black;">
                                             {{ $patient->patient_code }}
                                             </td>
-                                            <td>{{ $patient->name }}</td>
+                                            <td>{{ ucwords(strtolower($patient->name)) }}</td>
                                             <td>{{ $patient->age }}</td>
                                             <td>
                                                 <span
