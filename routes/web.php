@@ -103,37 +103,33 @@ Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard
     // Routes for sending patient data to Worklist Server
     Route::post('/send-to-worklist/{id}', function (Request $request, $id) {
         $patient = Patient::find($id);
+
         if (!$patient) {
-            return response()->json(['success' => false, 'message' => 'Pasien tidak ditemukan.'], 404);
+          return response()->json([
+		'success' => false,
+		'message' => 'Pasien tidak ditemukan.'
+	  ], 404);
         }
 
-        $response = Http::post('http://localhost:8081/create-worklist', [  // ← fix port + endpoint
-            'patient_id'   => $patient->patient_code,
-            'patient_name' => $patient->name,
-            'gender'       => $patient->gender,
-            'age'          => $patient->age,
-            'modality'     => 'ECG',
-            'study_date'   => now()->format('Ymd'),
+        $patient->isInWorklist = 1;
+        $patient->save();
+
+
+        return response()->json([
+              'success' => true,
+              'message' => 'Pasien berhasil ditambahkan ke worklist.',
+
         ]);
-
-        if ($response->successful()) {
-            $patient->isInWorklist = 1;
-            $patient->save();
-            return response()->json(['success' => true]);
-        } else {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal mengirim ke Worklist Server.',
-                'error'   => $response->body()
-            ], $response->status());
-        }
     });
 
-// Routes test-heart
-Route::get('/test-heart', function () {
-    broadcast(new HeartRateUpdated(rand(60, 100)));
-    return "broadcast sent";
-});
+
+
+
+   // Routes test-heart
+   Route::get('/test-heart', function () {
+      broadcast(new HeartRateUpdated(rand(60, 100)));
+      return "broadcast sent";
+   });
 
 });
 
