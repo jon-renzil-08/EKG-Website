@@ -66,7 +66,48 @@ Route::get('/worklist', function (Request $request) {
 Route::post('/worklist/create', [WorklistController::class, 'create']);
 Route::post('/worklist/destroy', [WorklistController::class, 'destroy']);
 
+
+
 // Routes ECG_result API
+
+Route::get('result', function (Request $request) {
+    $perPage = $request->query('per_page', 20);
+
+    $results = EkgResult::with('patient')
+        ->latest()
+        ->paginate($perPage);
+
+    return response()->json([
+        'status' => 'ok',
+        'data'   => collect($results->items())->map(function ($ekg) {
+            return [
+                'id'               => $ekg->id,
+                'patient_code'     => $ekg->patient->patient_code ?? 'unknown',
+                'patient_name'     => $ekg->patient->name ?? 'unknown',
+                'gender'           => $ekg->patient->gender ?? null,
+                'age'              => $ekg->patient->age ?? null,
+                'result_file_type' => $ekg->result_file_type,
+                'input_source'     => $ekg->input_source,
+                'examination_date' => $ekg->examination_date->format('Y-m-d H:i:s'),
+                'pdf_url'          => $ekg->result_file_path
+                    ? url("/ekg/download/{$ekg->id}/pdf")
+                    : null,
+                'xml_url'          => $ekg->xml_file_path
+                    ? url("/ekg/download/{$ekg->id}/xml")
+                    : null,
+                'dat_url'          => $ekg->dat_file_path
+                    ? url("/ekg/download/{$ekg->id}/dat")
+                    : null,
+            ];
+        })->values()->all(),
+        'pagination' => [
+            'current_page' => $results->currentPage(),
+            'last_page'    => $results->lastPage(),
+            'total'        => $results->total(),
+        ],
+    ]);
+});
+
 Route::post('/ecg-result', function (Request $request) {
     if (! $request->hasFile('file')) {
         return response()->json(['status' => 'error', 'message' => 'No file uploaded'], 400);
