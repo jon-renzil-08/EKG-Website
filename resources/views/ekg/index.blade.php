@@ -44,7 +44,7 @@
                                             <td>{{ ($ekgResults->currentPage() - 1) * $ekgResults->perPage() + $loop->iteration }}
                                             </td>
                                             <td style="font-weight: bold;">{{ $ekg->patient->patient_code }}</td>
-                                            <td>{{ $ekg->patient->name }}</td>
+                                            <td>{{ ucwords(strtolower($ekg->patient->name)) }}</td>
                                             <td>{{ $ekg->patient->age }}</td>
                                             <td>
                                                 <span
