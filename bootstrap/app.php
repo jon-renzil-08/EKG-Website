@@ -42,6 +42,9 @@ $app->singleton(
 );
 
 
+// bootstrap/app.php
+
+
 /*
 |--------------------------------------------------------------------------
 | Return The Application
