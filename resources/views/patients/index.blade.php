@@ -32,7 +32,7 @@
                                 <thead>
                                     <tr>
                                         <th style="font-weight: bold; color: black;">No</th>
-                                        <th style="font-weight: bold; color: black;">Barcode</th>
+                                        <th style="font-weight: bold; color: black;">ID</th>
                                         <th style="font-weight: bold; color: black;">Name</th>
                                         <th style="font-weight: bold; color: black;">Age</th>
                                         <th style="font-weight: bold; color: black;">Gender</th>
