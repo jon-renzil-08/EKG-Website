@@ -30,12 +30,9 @@
                                         <th style="font-weight: bold; color: black;">No</th>
                                         <th style="font-weight: bold; color: black;">ID</th>
                                         <th style="font-weight: bold; color: black;">Name</th>
-                                        <th style="font-weight: bold; color: black;">Age</th>
-                                        <th style="font-weight: bold; color: black;">Gender</th>
-                                        <th style="font-weight: bold; color: black;">Pacemaker</th>
-                                        <th style="font-weight: bold; color: black;">Source</th>
                                         <th style="font-weight: bold; color: black;">Result EKG</th>
                                         <th style="font-weight: bold; color: black;">Examination Date</th>
+                                        <th style="font-weight: bold; color: black;">Information</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -45,42 +42,27 @@
                                             </td>
                                             <td style="font-weight: bold;">{{ $ekg->patient->patient_code }}</td>
                                             <td>{{ ucwords(strtolower($ekg->patient->name)) }}</td>
-                                            <td>{{ $ekg->patient->age }}</td>
-                                            <td>
-                                                <span
-                                                    class="badge bg-{{ $ekg->patient->gender == 'Male' ? 'primary' : ($ekg->patient->gender == 'Female' ? 'danger' : 'secondary') }}">
-                                                    {{ $ekg->patient->gender }}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <span
-                                                    class="badge bg-{{ $ekg->patient->pacemaker == 'Yes' ? 'warning' : 'success' }}">
-                                                    {{ $ekg->patient->pacemaker }}
-                                                </span>
-                                            </td>
-                                            <td>
-                                                <span class="badge bg-info">{{ $ekg->patient->source }}</span>
-                                            </td>
+
                                             {{-- Kolom tombol download --}}
                                             <td>
                                                 @if ($ekg->result_file_path)
                                                     <a href="{{ route('ekg.download', ['id' => $ekg->id, 'type' => 'pdf']) }}"
                                                         class="btn btn-sm btn-success" target="_blank">
-                                                        <i class="fas fa-file-pdf me-1"></i>PDF
+                                                        <i class="fas fa-file-pdf me-1"></i>Download PDF
                                                     </a>
                                                 @endif
 
                                                 @if ($ekg->xml_file_path)
                                                     <a href="{{ route('ekg.download', ['id' => $ekg->id, 'type' => 'xml']) }}"
                                                         class="btn btn-sm btn-info" target="_blank">
-                                                        <i class="fas fa-file-code me-1"></i>XML
+                                                        <i class="fas fa-file-code me-1"></i>Download XML
                                                     </a>
                                                 @endif
 
                                                 @if ($ekg->dat_file_path)
                                                     <a href="{{ route('ekg.download', ['id' => $ekg->id, 'type' => 'dat']) }}"
                                                         class="btn btn-sm btn-warning" target="_blank">
-                                                        <i class="fas fa-file-alt me-1"></i>DAT
+                                                        <i class="fas fa-file-alt me-1"></i>Download DAT
                                                     </a>
                                                 @endif
 
@@ -89,6 +71,14 @@
                                                 @endif
                                             </td>
                                             <td>{{ $ekg->examination_date->format('d/m/Y H:i') }}</td>
+                                            <td>
+                                                @if ($ekg->patient->isInWorklist === 1)
+                                                    <span class="badge bg-success">Auto EKG</span>
+                                                @else
+                                                    <span class="badge bg-danger">Manual</span>
+                                                @endif
+                                            </td>
+
                                         </tr>
                                     @empty
                                         <tr>
