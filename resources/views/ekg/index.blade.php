@@ -75,7 +75,7 @@
                                                 @if ($ekg->patient->isInWorklist === 1)
                                                     <span class="badge bg-success">Auto EKG</span>
                                                 @else
-                                                    <span class="badge bg-danger">Manual</span>
+                                                    <span class="badge bg-danger">Manual EKG</span>
                                                 @endif
                                             </td>
 
