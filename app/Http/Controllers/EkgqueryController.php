@@ -35,7 +35,7 @@ class EkgQueryController extends Controller
             // dipakai di EkgReceiveController HANYA sebagai fallback terakhir kalau
             // ekstraksi dari file PDF/XML gagal total -- bukan sumber utama, supaya
             // tidak mengulang bug "stale patient id" yang dulu terjadi di middleware Python.
-            Cache::put('ekg_last_queried_patient_id', $patientId, now()->addMinutes(15));
+            Cache::put('ekg_last_queried_patient_id', $patientId, now()->addMinutes(2));
 
             $patients = Patient::where('isInWorklist', 1)
                 ->where('patient_code', $patientId)

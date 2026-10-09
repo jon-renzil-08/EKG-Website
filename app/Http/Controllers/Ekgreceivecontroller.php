@@ -13,6 +13,7 @@ use Illuminate\Support\Str;
 class EkgReceiveController extends Controller
 {
     private ?string $lastOrigin = null;
+    private ?string $lastPatientCode = null;
     public function receive(Request $request)
     {
         try {
@@ -103,25 +104,94 @@ class EkgReceiveController extends Controller
         return $name !== '' ? $name : null;
     }
 
-    private function rememberGuidPatient(?string $guid, ?string $patientCode): void
+
+    private function holdPendingDat(string $savedPath): void
     {
-        if ($guid && $patientCode) {
-            Cache::put("ekg_guid_patient:{$guid}", $patientCode, now()->addMinutes(10));
-        }
+        $now = now()->timestamp;
+        $list = Cache::get('ekg_pending_dats', []);
+
+        // buang yang lebih dari 180 detik
+        $list = array_values(array_filter($list, fn($d) => $now - $d['at'] <= 180));
+        $list[] = ['path' => $savedPath, 'at' => $now];
+
+        Cache::put('ekg_pending_dats', $list, now()->addMinutes(10));
+        Log::info('[DAT] Ditahan menunggu PDF/XML berikutnya', ['path' => $savedPath]);
     }
 
-    private function attachPendingDat(?string $guid): void
+    private function attachPendingDat(?string $patientCode): void
     {
-        if (!$guid) {
+        if (!$patientCode) {
             return;
         }
-        $pendingPath = Cache::pull("ekg_pending_dat:{$guid}");
-        $patientCode = Cache::get("ekg_guid_patient:{$guid}");
 
-        if ($pendingPath && $patientCode) {
-            $this->saveDatResult($patientCode, $pendingPath);
-            Log::info("[DAT] Pending DAT ditempelkan ke {$patientCode}");
+        $now = now()->timestamp;
+        $list = Cache::get('ekg_pending_dats', []);
+        $list = array_values(array_filter($list, fn($d) => $now - $d['at'] <= 180));
+
+        if (empty($list)) {
+            return;
         }
+
+        // ambil DAT terbaru, buang sisanya supaya tidak menempel ke pemeriksaan lain
+        $latest = end($list);
+        Cache::forget('ekg_pending_dats');
+
+        $this->saveDatResult($patientCode, $latest['path']);
+        Log::info("[DAT] Ditempelkan ke {$patientCode}", ['path' => $latest['path']]);
+    }
+
+    private function printableTokens(string $raw): array
+    {
+        $text = str_replace("\0", '', $raw);
+        preg_match_all('/[\x20-\x7E]{3,40}/', $text, $m);
+        return array_values(array_unique(array_map('trim', $m[0])));
+    }
+
+    private function findPatientCodeInTokens(array $tokens): ?string
+    {
+        if (empty($tokens)) {
+            return null;
+        }
+        // cocokkan token dengan patient_code yang sudah ada di database
+        return Patient::whereIn('patient_code', $tokens)->value('patient_code');
+    }
+
+    private function parseDat(string $raw, string $guid): ?array
+    {
+        $text = str_replace("\0", '', $raw);
+        preg_match_all('/[\x20-\x7E]{2,120}/', $text, $m);
+
+        // string di DAT diawali 1 byte panjang ("$" = 36, "!" = 33, dst), buang byte itu
+        $tokens = array_map(function ($t) {
+            if (strlen($t) > 1 && ord($t[0]) === strlen($t) - 1) {
+                $t = substr($t, 1);
+            }
+            return trim($t);
+        }, $m[0]);
+
+        $idx = array_search(strtoupper($guid), array_map('strtoupper', $tokens), true);
+        if ($idx === false) {
+            return null;
+        }
+
+        $patientId = $tokens[$idx + 1] ?? null;
+        $name = $tokens[$idx + 2] ?? null;
+        $ageToken = $tokens[$idx + 3] ?? '';
+        $sexToken = $tokens[$idx + 4] ?? '';
+
+        if (!$patientId || !preg_match('/^[A-Za-z0-9\-_\.\/]{1,64}$/', $patientId)) {
+            return null;
+        }
+
+        $age = preg_match('/^(\d{1,3})Y/', $ageToken, $a) ? (string) ((int) $a[1]) : null;
+        $sex = preg_match('/^([MF])/i', $sexToken, $s) ? strtoupper($s[1]) : null;
+
+        return [
+            'patient_id' => $patientId,
+            'patient_name' => $name ?: null,
+            'patient_sex' => $sex,
+            'patient_age' => $age,
+        ];
     }
 
 
@@ -141,9 +211,8 @@ class EkgReceiveController extends Controller
                 ], now()->addMinutes(10));
             }
 
-            $this->rememberGuidPatient($guid, $extracted['patient_id'] ?? null);
             $this->savePdfResult($extracted, $savedPath);
-            $this->attachPendingDat($guid);
+            $this->attachPendingDat($this->lastPatientCode);
 
         } elseif ($payloadType === 'FDA_XML') {
             $extracted = $this->extractPatientFromXml($rawBody);
@@ -159,24 +228,26 @@ class EkgReceiveController extends Controller
 
             Storage::disk('local')->put($savedPath, $xmlToStore);
 
-            $this->rememberGuidPatient($guid, $extracted['patient_id'] ?? null);
             $this->saveXmlResult($extracted, $savedPath);
-            $this->attachPendingDat($guid);
+            $this->attachPendingDat($this->lastPatientCode);
 
         } elseif ($payloadType === 'DAT') {
-            $patientCode = $guid ? Cache::get("ekg_guid_patient:{$guid}") : null;
+            $dat = $this->parseDat($rawBody, (string) $guid);
 
-            if ($patientCode) {
-                Log::info("[DAT] Dikaitkan lewat GUID ke {$patientCode}");
-                $this->saveDatResult($patientCode, $savedPath);
-            } elseif ($guid) {
-                // PDF/XML pemeriksaan ini belum datang: tahan dulu
-                Cache::put("ekg_pending_dat:{$guid}", $savedPath, now()->addMinutes(10));
-                Log::info("[DAT] Belum ada pasangan untuk GUID {$guid}, ditahan");
+            if ($dat) {
+                Log::info('[DAT] Pasien dari isi file', ['patient_id' => $dat['patient_id']]);
+
+                $patient = $this->resolvePatient(
+                    $dat['patient_id'],
+                    $dat['patient_name'],
+                    $dat['patient_sex'],
+                    $dat['patient_age']
+                );
+                $this->upsertEkgResult($patient, 'dat_file_path', $savedPath);
             } else {
-                Log::warning('[DAT] Tidak ada GUID, file tersimpan tanpa dikaitkan', ['path' => $savedPath]);
+                Log::warning('[DAT] ID pasien tidak terbaca dari isi file, ditahan', ['path' => $savedPath]);
+                $this->holdPendingDat($savedPath);
             }
-
         } else {
             Log::warning("Payload type tidak didukung: {$payloadType}");
         }
@@ -301,15 +372,29 @@ class EkgReceiveController extends Controller
     private function resolvePatient(?string $extractedPatientId, ?string $name, ?string $sex, ?string $age, ?string $pacemaker = null): Patient
     {
         $queried = Cache::get('ekg_last_queried_patient_id');
-        $patientCode = $extractedPatientId ?: $queried;
 
-        if (!$patientCode) {
+        if ($extractedPatientId) {
+            $patientCode = $extractedPatientId;
+            $source = 'dokumen';
+            $origin = ($queried && $queried === $extractedPatientId) ? 'QUERY' : 'MANUAL';
+
+            // ID di file berbeda dari query terakhir = ini pemeriksaan manual,
+            // cache query lama tidak boleh dipakai lagi
+            if ($queried && $queried !== $extractedPatientId) {
+                Cache::forget('ekg_last_queried_patient_id');
+                Log::info("[PATIENT] ID file ({$extractedPatientId}) berbeda dari query ({$queried}), cache query dibuang");
+            }
+        } elseif ($queried) {
+            $patientCode = $queried;
+            $source = 'cache-query';
+            $origin = 'QUERY';
+            Log::warning("[PATIENT] ID tidak terbaca dari file, PAKAI cache query {$queried}. Cek apakah ini pemeriksaan manual!");
+        } else {
             throw new \RuntimeException('Tidak ada patient_id sama sekali, upload dibatalkan');
         }
 
-        $origin = ($queried && $queried === $patientCode) ? 'QUERY' : 'MANUAL';
         $this->lastOrigin = $origin;
-        $source = $extractedPatientId ? 'dokumen' : 'cache-query';
+        $this->lastPatientCode = $patientCode;
         Log::info("[PATIENT] code={$patientCode} source={$source} origin={$origin}");
 
         $patient = Patient::where('patient_code', $patientCode)->first();
@@ -335,7 +420,6 @@ class EkgReceiveController extends Controller
             'id' => $patient->id,
             'origin' => $origin,
             'code' => $patient->patient_code,
-            'name' => $patient->name,
             'gender' => $patient->gender,
             'age' => $patient->age,
             'pacemaker' => $patient->pacemaker,
@@ -377,7 +461,8 @@ class EkgReceiveController extends Controller
     private function upsertEkgResult(Patient $patient, string $column, string $path): void
     {
         $existing = EkgResult::where('patient_id', $patient->id)
-            ->where('examination_date', '>=', now()->subSeconds(60))
+            ->where('examination_date', '>=', now()->subSeconds(180))
+            ->whereNull($column)
             ->latest('examination_date')
             ->first();
 
