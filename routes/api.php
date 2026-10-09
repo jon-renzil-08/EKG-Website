@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\WorklistController;
+use App\Http\Controllers\EkgQueryController;
+use App\Http\Controllers\EkgReceiveController;
 use App\Models\EkgResult;
 use App\Models\Patient;
 use Illuminate\Http\Request;
@@ -211,5 +213,10 @@ Route::get('/check-new-ekg', function (Request $request) {
         'last_id'     => $newResults->max('ekg_id') ?? $lastId,
     ]);
 });
+
+
+
+Route::post('/query', [EkgQueryController::class, 'query']);
+Route::post('/receive', [EkgReceiveController::class, 'receive']);
 
 
