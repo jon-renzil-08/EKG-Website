@@ -13,6 +13,7 @@ class EkgResult extends Model
 
     protected $fillable = [
         'patient_id',
+        'origin',
         'result_file_path',
         'result_file_type',
         'xml_file_path',
