@@ -10,19 +10,9 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
-/**
- * Pengganti endpoint /receive di middleware Python.
- * Device kirim POST dengan body RAW BINARY (bukan multipart), nama file
- * lewat header custom "Filename", Content-Type sesuai jenis file
- * (application/pdf, application/xml, application/octet-stream untuk .dat).
- *
- * CATATAN: nama header "Filename" dan cara klasifikasi tipe file di sini
- * adalah ASUMSI berdasarkan raw HTTP dump yang pernah diperiksa sebelumnya.
- * Perlu divalidasi ulang begitu ada kesempatan test pakai device asli --
- * kalau header-nya ternyata beda, tinggal sesuaikan di getFilenameFromRequest().
- */
 class EkgReceiveController extends Controller
 {
+    private ?string $lastOrigin = null;
     public function receive(Request $request)
     {
         try {
@@ -53,9 +43,7 @@ class EkgReceiveController extends Controller
         }
     }
 
-    // ------------------------------------------------------------------
-    // Helpers dasar
-    // ------------------------------------------------------------------
+
 
     private function getFilenameFromRequest(Request $request): string
     {
@@ -72,7 +60,7 @@ class EkgReceiveController extends Controller
         $map = [
             'application/pdf' => 'ecg_result.pdf',
             'application/xml' => 'ecg_result.xml',
-            'text/xml'        => 'ecg_result.xml',
+            'text/xml' => 'ecg_result.xml',
         ];
         return $map[$contentType] ?? 'ecg_result.dat';
     }
@@ -105,11 +93,7 @@ class EkgReceiveController extends Controller
         return response($xml, 200)->header('Content-Type', 'application/xml');
     }
 
-    // ------------------------------------------------------------------
-    // GUID pairing (sama konsep dengan _guid_cache di Python) --
-    // dipakai untuk pasangkan PDF + XML dari exam yang sama, supaya
-    // Age yang diekstrak dari PDF bisa di-inject ke file XML pasangannya.
-    // ------------------------------------------------------------------
+
 
     private function extractGuidFromFilename(string $filename): ?string
     {
@@ -119,9 +103,28 @@ class EkgReceiveController extends Controller
         return $name !== '' ? $name : null;
     }
 
-    // ------------------------------------------------------------------
-    // Routing & ekstraksi data pasien
-    // ------------------------------------------------------------------
+    private function rememberGuidPatient(?string $guid, ?string $patientCode): void
+    {
+        if ($guid && $patientCode) {
+            Cache::put("ekg_guid_patient:{$guid}", $patientCode, now()->addMinutes(10));
+        }
+    }
+
+    private function attachPendingDat(?string $guid): void
+    {
+        if (!$guid) {
+            return;
+        }
+        $pendingPath = Cache::pull("ekg_pending_dat:{$guid}");
+        $patientCode = Cache::get("ekg_guid_patient:{$guid}");
+
+        if ($pendingPath && $patientCode) {
+            $this->saveDatResult($patientCode, $pendingPath);
+            Log::info("[DAT] Pending DAT ditempelkan ke {$patientCode}");
+        }
+    }
+
+
 
     private function routeToHis(string $payloadType, string $rawBody, string $filename, string $savedPath): void
     {
@@ -129,15 +132,18 @@ class EkgReceiveController extends Controller
 
         if ($payloadType === 'RAW_PDF') {
             $extracted = $this->extractPatientFromPdf($rawBody);
+            Log::info('[PDF] Hasil ekstraksi', ['patient_id' => $extracted['patient_id'] ?? null]);
 
             if ($guid && $extracted && !empty($extracted['patient_age'])) {
                 Cache::put("ekg_guid_cache:{$guid}", [
-                    'patient_age'  => $extracted['patient_age'],
+                    'patient_age' => $extracted['patient_age'],
                     'patient_name' => $extracted['patient_name'] ?? null,
                 ], now()->addMinutes(10));
             }
 
+            $this->rememberGuidPatient($guid, $extracted['patient_id'] ?? null);
             $this->savePdfResult($extracted, $savedPath);
+            $this->attachPendingDat($guid);
 
         } elseif ($payloadType === 'FDA_XML') {
             $extracted = $this->extractPatientFromXml($rawBody);
@@ -151,16 +157,25 @@ class EkgReceiveController extends Controller
                 Cache::forget("ekg_guid_cache:{$guid}");
             }
 
-            // simpan ulang file XML yang sudah disisipi Age (replace file yang sudah tersimpan)
             Storage::disk('local')->put($savedPath, $xmlToStore);
 
+            $this->rememberGuidPatient($guid, $extracted['patient_id'] ?? null);
             $this->saveXmlResult($extracted, $savedPath);
+            $this->attachPendingDat($guid);
 
         } elseif ($payloadType === 'DAT') {
-            // DAT tidak pernah dikirim saat manual entry (sudah dikonfirmasi sebelumnya),
-            // jadi cukup pakai fallback patient_id dari cache /query terakhir.
-            $patientId = Cache::get('ekg_last_queried_patient_id');
-            $this->saveDatResult($patientId, $savedPath);
+            $patientCode = $guid ? Cache::get("ekg_guid_patient:{$guid}") : null;
+
+            if ($patientCode) {
+                Log::info("[DAT] Dikaitkan lewat GUID ke {$patientCode}");
+                $this->saveDatResult($patientCode, $savedPath);
+            } elseif ($guid) {
+                // PDF/XML pemeriksaan ini belum datang: tahan dulu
+                Cache::put("ekg_pending_dat:{$guid}", $savedPath, now()->addMinutes(10));
+                Log::info("[DAT] Belum ada pasangan untuk GUID {$guid}, ditahan");
+            } else {
+                Log::warning('[DAT] Tidak ada GUID, file tersimpan tanpa dikaitkan', ['path' => $savedPath]);
+            }
 
         } else {
             Log::warning("Payload type tidak didukung: {$payloadType}");
@@ -170,41 +185,50 @@ class EkgReceiveController extends Controller
     private function extractPatientFromPdf(string $pdfBytes): ?array
     {
         try {
-            $tmpPath = tempnam(sys_get_temp_dir(), 'ekg_pdf_') . '.pdf';
-            file_put_contents($tmpPath, $pdfBytes);
-
-            // butuh: composer require smalot/pdfparser
             $parser = new \Smalot\PdfParser\Parser();
-            $pdf = $parser->parseFile($tmpPath);
-            $text = $pdf->getText();
-            @unlink($tmpPath);
+            $text = $parser->parseContent($pdfBytes)->getText();
+
+            // buang karakter NUL (teks 16-bit terbaca 8-bit)
+            $text = str_replace("\0", '', $text);
+
+            // DEBUG SEMENTARA (hapus setelah selesai, isinya data pasien):
+            // baris unik, tanpa angka tunggal dari grafik
+            $lines = array_values(array_unique(array_filter(
+                array_map('trim', preg_split('/\R/', $text)),
+                fn($l) => $l !== '' && !preg_match('/^-?\d{1,3}$/', $l)
+            )));
+            Log::info('[PDF] Teks bersih', ['lines' => array_slice($lines, 0, 60)]);
 
             $patientId = null;
             if (preg_match('/ID:\s*([A-Za-z0-9\-]+)/', $text, $m)) {
                 $patientId = trim($m[1]);
             }
-
-            $patientName = null;
-            if ($patientId && preg_match('/ID:\s*' . preg_quote($patientId, '/') . '\s*\n?\s*(.+)/', $text, $m)) {
-                $patientName = trim($m[1]);
-            }
-
-            $sex = null;
-            $age = null;
-            if (preg_match('/(Male|Female)\s+(\d+)\s*Years/i', $text, $m)) {
-                $sex = strtoupper(substr($m[1], 0, 1)); // Male->M, Female->F
-                $age = $m[2];
-            }
-
             if (!$patientId) {
                 return null;
             }
 
+            $patientName = null;
+            if (preg_match('/ID:\s*' . preg_quote($patientId, '/') . '\s*\n?\s*(.+)/', $text, $m)) {
+                $patientName = trim($m[1]);
+            }
+
+            $sex = $age = null;
+            if (preg_match('/(Male|Female)\s+(\d+)\s*Years/i', $text, $m)) {
+                $sex = strtoupper(substr($m[1], 0, 1));
+                $age = $m[2];
+            }
+
+            $pacemaker = null;
+            if (preg_match('/Pacemaker:\s*(Yes|No)/i', $text, $m)) {
+                $pacemaker = ucfirst(strtolower($m[1]));
+            }
+
             return [
-                'patient_id'   => $patientId,
+                'patient_id' => $patientId,
                 'patient_name' => $patientName,
-                'patient_sex'  => $sex,
-                'patient_age'  => $age,
+                'patient_sex' => $sex,
+                'patient_age' => $age,
+                'patient_pacemaker' => $pacemaker,
             ];
         } catch (\Throwable $e) {
             Log::warning('Gagal ekstrak data dari PDF: ' . $e->getMessage());
@@ -234,9 +258,9 @@ class EkgReceiveController extends Controller
             }
 
             return [
-                'patient_id'   => $patientId,
+                'patient_id' => $patientId,
                 'patient_name' => $name ?: null,
-                'patient_sex'  => $sex ?: null,
+                'patient_sex' => $sex ?: null,
             ];
         } catch (\Throwable $e) {
             Log::warning('Gagal ekstrak data dari XML: ' . $e->getMessage());
@@ -258,7 +282,8 @@ class EkgReceiveController extends Controller
 
             $ageNodes = $patientInfo->getElementsByTagName('Age');
             if ($ageNodes->length > 0) {
-                $ageNodes->item(0)->nodeValue = $age;
+                $ageElement = $doc->createElement('Age', $age);
+                $patientInfo->replaceChild($ageElement, $ageNodes->item(0));
             } else {
                 $ageElement = $doc->createElement('Age', $age);
                 $patientInfo->appendChild($ageElement);
@@ -271,38 +296,52 @@ class EkgReceiveController extends Controller
         }
     }
 
-    // ------------------------------------------------------------------
-    // Penyimpanan ke DB -- resolve pasien (extract dulu, fallback cache,
-    // baru auto-register) sesuai fix bug stale-patient-id yang sudah
-    // terbukti benar di middleware Python.
-    // ------------------------------------------------------------------
 
-    private function resolvePatient(?string $extractedPatientId, ?string $name, ?string $sex, ?string $age): Patient
+
+    private function resolvePatient(?string $extractedPatientId, ?string $name, ?string $sex, ?string $age, ?string $pacemaker = null): Patient
     {
-        $patientCode = $extractedPatientId ?: Cache::get('ekg_last_queried_patient_id');
+        $queried = Cache::get('ekg_last_queried_patient_id');
+        $patientCode = $extractedPatientId ?: $queried;
 
         if (!$patientCode) {
             throw new \RuntimeException('Tidak ada patient_id sama sekali, upload dibatalkan');
         }
 
+        $origin = ($queried && $queried === $patientCode) ? 'QUERY' : 'MANUAL';
+        $this->lastOrigin = $origin;
+        $source = $extractedPatientId ? 'dokumen' : 'cache-query';
+        Log::info("[PATIENT] code={$patientCode} source={$source} origin={$origin}");
+
         $patient = Patient::where('patient_code', $patientCode)->first();
         if ($patient) {
+            Log::info("[PATIENT] Ditemukan id={$patient->id} origin={$origin}");
             return $patient;
         }
 
-        // auto-register pasien baru (manual entry dari device, belum ada di Laravel)
         $genderMap = ['M' => 'Male', 'F' => 'Female'];
         $rawSex = strtoupper($sex ?? '');
 
-        return Patient::create([
-            'patient_code'  => $patientCode,
-            'name'          => $name ?: 'Unknown',
-            'gender'        => $genderMap[$rawSex] ?? 'Unknown',
-            'age'           => $age ?: 0,
-            'pacemaker'     => 'No',
-            'isInWorklist'  => 2,
-            'source'        => 'Outpatient',
+        $patient = Patient::create([
+            'patient_code' => $patientCode,
+            'name' => $name ?: 'Unknown',
+            'gender' => $genderMap[$rawSex] ?? 'Unknown',
+            'age' => $age ?: 0,
+            'pacemaker' => $pacemaker ?: 'No',
+            'isInWorklist' => 2,
+            'source' => 'Outpatient',
         ]);
+
+        Log::info('[PATIENT] Auto-register', [
+            'id' => $patient->id,
+            'origin' => $origin,
+            'code' => $patient->patient_code,
+            'name' => $patient->name,
+            'gender' => $patient->gender,
+            'age' => $patient->age,
+            'pacemaker' => $patient->pacemaker,
+        ]);
+
+        return $patient;
     }
 
     private function savePdfResult(?array $extracted, string $savedPath): void
@@ -311,7 +350,8 @@ class EkgReceiveController extends Controller
             $extracted['patient_id'] ?? null,
             $extracted['patient_name'] ?? null,
             $extracted['patient_sex'] ?? null,
-            $extracted['patient_age'] ?? null
+            $extracted['patient_age'] ?? null,
+            $extracted['patient_pacemaker'] ?? null
         );
         $this->upsertEkgResult($patient, 'result_file_path', $savedPath);
     }
@@ -333,11 +373,7 @@ class EkgReceiveController extends Controller
         $this->upsertEkgResult($patient, 'dat_file_path', $savedPath);
     }
 
-    /**
-     * Gabungkan ke 1 row ekg_results kalau ada row untuk pasien yang sama
-     * dalam window 60 detik terakhir (exam yang sama, cuma format file beda),
-     * sesuai logic yang sudah ada di route /ecg-result Laravel.
-     */
+
     private function upsertEkgResult(Patient $patient, string $column, string $path): void
     {
         $existing = EkgResult::where('patient_id', $patient->id)
@@ -347,13 +383,20 @@ class EkgReceiveController extends Controller
 
         if ($existing) {
             $existing->update([$column => $path]);
-            return;
+            Log::info("[EKG] Update row id={$existing->id}, kolom={$column}");
+        } else {
+            $created = EkgResult::create([
+                'patient_id' => $patient->id,
+                'origin' => $this->lastOrigin,
+                $column => $path,
+                'examination_date' => now(),
+            ]);
+            Log::info("[EKG] Insert row id={$created->id}, kolom={$column}, origin={$this->lastOrigin}");
         }
 
-        EkgResult::create([
-            'patient_id'       => $patient->id,
-            $column            => $path,
-            'examination_date' => now(),
-        ]);
+        if ((int) $patient->isInWorklist !== 2) {
+            $patient->update(['isInWorklist' => 2]);
+            Log::info("[WORKLIST] Pasien id={$patient->id} isInWorklist -> 2 (selesai)");
+        }
     }
 }

@@ -21,7 +21,7 @@ class EkgQueryController extends Controller
     public function query(Request $request)
     {
         $rawXml = $request->getContent();
-        Log::info('RAW XML dari device (/query):', ['xml' => $rawXml]);
+        Log::info('RAW XML dari device (/api/query):', ['xml' => $rawXml]);
 
         try {
             $patientId = $this->parsePatientIdFromXml($rawXml);
