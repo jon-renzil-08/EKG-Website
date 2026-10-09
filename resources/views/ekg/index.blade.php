@@ -32,6 +32,7 @@
                                         <th style="font-weight: bold; color: black;">Name</th>
                                         <th style="font-weight: bold; color: black;">Result EKG</th>
                                         <th style="font-weight: bold; color: black;">Examination Date</th>
+                                        <th style="font-weight: bold; color: black;">Status</th>
                                         <th style="font-weight: bold; color: black;">Information</th>
                                     </tr>
                                 </thead>
@@ -72,10 +73,32 @@
                                             </td>
                                             <td>{{ $ekg->examination_date->format('d/m/Y H:i') }}</td>
                                             <td>
-                                                @if ($ekg->patient->isInWorklist === 1)
-                                                    <span class="badge bg-success">Auto EKG</span>
+                                                @if ($ekg->patient->isInWorklist === 2)
+                                                    <span class="badge bg-success p-2">
+                                                        <i class="fas fa-check-circle me-1"></i> Selesai EKG
+                                                    </span>
+                                                @elseif ($ekg->patient->isInWorklist === 1)
+                                                    <span class="badge bg-warning p-2">
+                                                        <i class="fas fa-clock me-1"></i> Dalam Antrian
+                                                    </span>
                                                 @else
-                                                    <span class="badge bg-danger">Manual EKG</span>
+                                                    <span class="badge bg-danger p-2">
+                                                        <i class="fas fa-times-circle me-1"></i> Belum Dikirim
+                                                    </span>
+                                                @endif
+                                            </td>
+
+                                            <td>
+                                                @if ($ekg->origin === 'QUERY')
+                                                    <span class="badge bg-primary p-2">
+                                                        <i class="fas fa-list me-1"></i> Otomatis EKG
+                                                    </span>
+                                                @elseif ($ekg->origin === 'MANUAL')
+                                                    <span class="badge bg-secondary p-2">
+                                                        <i class="fas fa-keyboard me-1"></i> Manual EKG
+                                                    </span>
+                                                @else
+                                                    <span class="text-muted">-</span>
                                                 @endif
                                             </td>
 
