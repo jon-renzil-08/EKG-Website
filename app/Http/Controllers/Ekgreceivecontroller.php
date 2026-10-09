@@ -262,13 +262,6 @@ class EkgReceiveController extends Controller
             // buang karakter NUL (teks 16-bit terbaca 8-bit)
             $text = str_replace("\0", '', $text);
 
-            // DEBUG SEMENTARA (hapus setelah selesai, isinya data pasien):
-            // baris unik, tanpa angka tunggal dari grafik
-            $lines = array_values(array_unique(array_filter(
-                array_map('trim', preg_split('/\R/', $text)),
-                fn($l) => $l !== '' && !preg_match('/^-?\d{1,3}$/', $l)
-            )));
-            Log::info('[PDF] Teks bersih', ['lines' => array_slice($lines, 0, 60)]);
 
             $patientId = null;
             if (preg_match('/ID:\s*([A-Za-z0-9\-]+)/', $text, $m)) {

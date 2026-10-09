@@ -21,29 +21,28 @@ class EkgQueryController extends Controller
     public function query(Request $request)
     {
         $rawXml = $request->getContent();
-        Log::info('RAW XML dari device (/api/query):', ['xml' => $rawXml]);
 
         try {
             $patientId = $this->parsePatientIdFromXml($rawXml);
-            Log::info("Received request for PatientID: {$patientId}");
+            Log::info('[QUERY] Diterima', ['patient_id' => $patientId]);
 
             if (!$patientId) {
                 return $this->errorXmlResponse('Patient not found');
             }
-
-            // Simpan sementara PatientID ini sebagai "kandidat terakhir yang di-query",
-            // dipakai di EkgReceiveController HANYA sebagai fallback terakhir kalau
-            // ekstraksi dari file PDF/XML gagal total -- bukan sumber utama, supaya
-            // tidak mengulang bug "stale patient id" yang dulu terjadi di middleware Python.
-            Cache::put('ekg_last_queried_patient_id', $patientId, now()->addMinutes(2));
 
             $patients = Patient::where('isInWorklist', 1)
                 ->where('patient_code', $patientId)
                 ->get();
 
             if ($patients->isEmpty()) {
+                Log::info('[QUERY] Tidak ada di worklist', ['patient_id' => $patientId]);
                 return $this->errorXmlResponse('Patient not found');
             }
+
+            // Fallback terakhir untuk EkgReceiveController kalau ekstraksi file gagal.
+            // Hanya disimpan kalau pasien memang ada di worklist, supaya ID salah ketik
+            // tidak ikut tersimpan.
+            Cache::put('ekg_last_queried_patient_id', $patientId, now()->addMinutes(2));
 
             return $this->worklistXmlResponse($patients);
 
@@ -85,8 +84,8 @@ class EkgQueryController extends Controller
     private function worklistXmlResponse($patients): \Illuminate\Http\Response
     {
         $sourceMap = [
-            'Outpatient'    => '0',
-            'Inpatient'     => '1',
+            'Outpatient' => '0',
+            'Inpatient' => '1',
             'Physical Exam' => '2',
         ];
 
@@ -100,8 +99,8 @@ class EkgQueryController extends Controller
             // age/name/sex kalau nanti device kirim XML hasil EKG tanpa info itu.
             Cache::put("ekg_patient_data:{$p->patient_code}", [
                 'patient_name' => $p->name,
-                'patient_sex'  => $sex,
-                'patient_age'  => (string) $p->age,
+                'patient_sex' => $sex,
+                'patient_age' => (string) $p->age,
             ], now()->addMinutes(15));
 
             $rowsXml .= '<rows>'
