@@ -23,7 +23,7 @@ use Illuminate\Support\Str;
 
 Route::middleware('auth:sanctum')->group(function () {
 
-});
+
 // Routes Worklist API
 Route::get('/worklist', function (Request $request) {
     $patientId = $request->query('patient_id');
@@ -212,6 +212,8 @@ Route::get('/check-new-ekg', function (Request $request) {
         'new_results' => $newResults,
         'last_id'     => $newResults->max('ekg_id') ?? $lastId,
     ]);
+});
+
 });
 
 
