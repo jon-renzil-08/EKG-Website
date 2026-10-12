@@ -1,8 +1,6 @@
 <?php
 
 use App\Http\Controllers\Api\WorklistController;
-use App\Http\Controllers\EkgQueryController;
-use App\Http\Controllers\EkgReceiveController;
 use App\Models\EkgResult;
 use App\Models\Patient;
 use Illuminate\Http\Request;
@@ -129,6 +127,11 @@ Route::post('/ecg-result', function (Request $request) {
 
     $patientCode = $request->input('patient_code', $patientCode);
 
+    $origin = strtoupper($request->input('origin', 'QUERY'));
+    if (! in_array($origin, ['QUERY', 'MANUAL'])) {
+        $origin = 'QUERY';
+    }
+
     $patient = Patient::where('patient_code', $patientCode)->first();
 
     if (! $patient) {
@@ -171,11 +174,15 @@ Route::post('/ecg-result', function (Request $request) {
         if ($extension === 'pdf') {
             $updateData['result_file_type'] = $fileType;
         }
+        if ($origin) {
+            $updateData['origin'] = $origin;
+        }
         $existing->update($updateData);
         $ekgResult = $existing;
     } else {
         $data = [
             'patient_id'          => $patient->id,
+            'origin'              => $origin,
             'examination_date'    => now(),
             'orthanc_instance_id' => $request->input('orthanc_instance_id'),
             $targetColumn         => $path,
@@ -214,11 +221,5 @@ Route::get('/check-new-ekg', function (Request $request) {
     ]);
 });
 
-
-
-
-
 // Route::post('/query', [EkgQueryController::class, 'query']);
 // Route::post('/receive', [EkgReceiveController::class, 'receive']);
-
-
