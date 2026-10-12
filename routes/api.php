@@ -23,7 +23,7 @@ use Illuminate\Support\Str;
 
 Route::middleware('auth:sanctum')->group(function () {
 
-
+});
 // Routes Worklist API
 Route::get('/worklist', function (Request $request) {
     $patientId = $request->query('patient_id');
@@ -214,11 +214,11 @@ Route::get('/check-new-ekg', function (Request $request) {
     ]);
 });
 
-});
 
 
 
-Route::post('/query', [EkgQueryController::class, 'query']);
-Route::post('/receive', [EkgReceiveController::class, 'receive']);
+
+// Route::post('/query', [EkgQueryController::class, 'query']);
+// Route::post('/receive', [EkgReceiveController::class, 'receive']);
 
 
