@@ -38,7 +38,6 @@
                                         <th style="font-weight: bold; color: black;">Gender</th>
                                         <th style="font-weight: bold; color: black;">Pacemaker</th>
                                         <th style="font-weight: bold; color: black;">Source</th>
-                                        <th style="font-weight: bold; color: black;">Worklist</th>
                                         <th style="font-weight: bold; color: black;">Status</th>
                                         <th style="font-weight: bold; color: black;">Action</th>
                                     </tr>
@@ -69,13 +68,6 @@
                                             </td>
                                             <td>
                                                 <span class="badge bg-info">{{ $patient->source }}</span>
-                                            </td>
-                                            <td>
-                                                @if ($patient->isInWorklist === 1)
-                                                    <span class="badge bg-success">Yes</span>
-                                                @else
-                                                    <span class="badge bg-danger">No</span>
-                                                @endif
                                             </td>
                                             <td>
                                                 @if ($patient->isInWorklist === 2)
@@ -238,7 +230,7 @@
                             btn.innerHTML = originalContent;
 
                             if (data.success) {
-                                showToast('success', 'Pasien berhasil dikirim ke worklist!');
+                                showToast('success', 'Pasien berhasil dikirim ke EKG!');
                                 setTimeout(() => location.reload(), 1500);
                             } else {
                                 showToast('error', 'Gagal: ' + data.message);

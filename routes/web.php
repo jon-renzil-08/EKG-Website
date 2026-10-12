@@ -7,6 +7,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EcgReportController;
 use App\Http\Controllers\PatientController;
 use App\Http\Controllers\EkgController;
+
 use App\Http\Controllers\JumbotronController;
 use App\Http\Controllers\OximonitorController;
 use App\Http\Controllers\LoginController;
@@ -132,5 +133,8 @@ Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard
    });
 
 });
+
+
+
 
 

@@ -37,17 +37,17 @@ class EkgController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'patient_id'       => 'required|exists:patients,id',
-            'result_file'      => 'required|file|mimes:pdf|max:2048',
+            'patient_id' => 'required|exists:patients,id',
+            'result_file' => 'required|file|mimes:pdf|max:2048',
             'examination_date' => 'required|date',
         ]);
 
-        $file     = $request->file('result_file');
+        $file = $request->file('result_file');
         $fileName = time() . '_' . $file->getClientOriginalName();
         $filePath = $file->storeAs('ekg_results', $fileName, 'public');
 
         EkgResult::create([
-            'patient_id'       => $request->patient_id,
+            'patient_id' => $request->patient_id,
             'result_file_path' => $filePath,
             'examination_date' => $request->examination_date,
         ]);
@@ -62,24 +62,24 @@ class EkgController extends Controller
 //         "http://127.0.0.1:8042/instances/{$instanceId}/pdf"
 //     );
 
-//     if (!$response->successful()) {
+    //     if (!$response->successful()) {
 //         abort(404, 'PDF tidak ditemukan di Orthanc.');
 //     }
 
-//     return response($response->body(), 200, [
+    //     return response($response->body(), 200, [
 //         'Content-Type' => 'application/pdf',
 //         'Content-Disposition' => 'attachment; filename="hasil_ekg.pdf"',
 //     ]);
 // }
 
-    public function destroy(EkgResult $ekgResult)
+    public function destroy(EkgResult $ekg)
     {
-        // Hapus file dari storage
-        if (Storage::disk('public')->exists($ekgResult->result_file_path)) {
-            Storage::disk('public')->delete($ekgResult->result_file_path);
+        if ($ekg->result_file_path && Storage::disk('public')->exists($ekg->result_file_path)) {
+            Storage::disk('public')->delete($ekg->result_file_path);
         }
 
-        $ekgResult->delete();
+        $ekg->delete();
+
         return redirect()->route('ekg.index')->with('success', 'EKG result deleted successfully');
     }
 }

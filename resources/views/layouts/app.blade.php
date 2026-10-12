@@ -139,6 +139,79 @@
             animation: pulse 2s infinite;
         }
 
+        :root {
+            --sidebar-width: 310px;
+        }
+
+        html,
+        body {
+            overflow-x: hidden;
+        }
+
+        /* Sidebar: default tertutup */
+        .sidebar {
+            width: var(--sidebar-width);
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            z-index: 1040;
+            transform: translateX(-100%);
+            transition: transform .3s ease;
+        }
+
+        /* Konten: default full width */
+        .main-wrapper {
+            margin-left: 0 !important;
+            width: auto !important;
+            max-width: 100% !important;
+            transition: margin-left .3s ease;
+        }
+
+        /* Topbar: aman kalau fixed/sticky */
+        .topbar {
+            left: 0 !important;
+            width: auto !important;
+        }
+
+        .content-area {
+            width: 100%;
+            max-width: none;
+        }
+
+        /* Saat sidebar dibuka */
+        body.sidebar-open .sidebar {
+            transform: translateX(0);
+        }
+
+        /* Backdrop */
+        .sidebar-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, .45);
+            z-index: 1035;
+        }
+
+        /* Desktop: konten bergeser */
+        @media (min-width: 992px) {
+            body.sidebar-open .main-wrapper {
+                margin-left: var(--sidebar-width) !important;
+                width: auto !important;
+            }
+
+            body.sidebar-open .topbar {
+                left: var(--sidebar-width) !important;
+            }
+        }
+
+        /* Mobile: sidebar menimpa konten + backdrop */
+        @media (max-width: 991.98px) {
+            body.sidebar-open .sidebar-backdrop {
+                display: block;
+            }
+        }
+
         @keyframes pulse {
 
             0%,
@@ -416,7 +489,7 @@
 <body>
 
     <!-- SIDEBAR -->
-    <nav class="sidebar">
+    <nav class="sidebar" id="sidebar">
         <div class="sidebar-brand">
             <div class="brand-icon">
                 <i class="fas fa-heartbeat text-white"></i>
@@ -429,38 +502,29 @@
             <p class="sidebar-label">Main Menu</p>
 
             <a class="nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}" href="{{ route('dashboard') }}">
-                <span class="nav-icon">
-                    <i class="fas fa-chart-pie"></i>
-                </span>
+                <span class="nav-icon"><i class="fas fa-chart-pie"></i></span>
                 Dashboard
             </a>
 
             <a class="nav-link {{ request()->routeIs('patients.*') ? 'active' : '' }}"
                 href="{{ route('patients.index') }}">
-                <span class="nav-icon">
-                    <i class="fas fa-user-injured"></i>
-                </span>
+                <span class="nav-icon"><i class="fas fa-user-injured"></i></span>
                 Daftar Pasien
             </a>
 
             <a class="nav-link {{ request()->routeIs('ekg.*') ? 'active' : '' }}" href="{{ route('ekg.index') }}">
-                <span class="nav-icon">
-                    <i class="fas fa-heartbeat"></i>
-                </span>
+                <span class="nav-icon"><i class="fas fa-heartbeat"></i></span>
                 Hasil EKG
             </a>
 
             <div style="margin-top: 12rem; margin-left: 1rem;">
                 <form method="POST" action="{{ route('logout') }}">
                     @csrf
-
-                    <button type="submit" class="logout-button">
-                        Logout
-                    </button>
+                    <button type="submit" class="logout-button">Logout</button>
                 </form>
-
             </div>
         </div>
+
         <div class="sidebar-footer">
             <div class="d-flex align-items-center gap-2">
                 <span class="status-dot"></span>
@@ -469,32 +533,39 @@
         </div>
     </nav>
 
+    <!-- BACKDROP (mobile) -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
     <!-- MAIN WRAPPER -->
     <div class="main-wrapper">
 
         <!-- TOPBAR -->
         <div class="topbar">
-            <div>
-                <h6 class="page-title">
-                    @yield('page-title', 'Dashboard')
-                </h6>
-                <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb mb-0">
-                        <li class="breadcrumb-item"><a href="{{ route('dashboard') }}"
-                                style="color: #1a3a8f; font-size: 0.78rem;">Home</a></li>
-                        <li class="breadcrumb-item active">@yield('page-title', 'Dashboard')</li>
-                    </ol>
-                </nav>
-            </div>
-            <div class="topbar-right">
-                <div class="btn btn-primary">
-                    {{ Auth::user()->name }}
+            <div class="d-flex align-items-center gap-3">
+                <button type="button" id="sidebarToggle" class="btn btn-light btn-sm" aria-label="Toggle sidebar">
+                    <i class="fas fa-bars"></i>
+                </button>
+
+                <div>
+                    <h6 class="page-title">@yield('page-title', 'Dashboard')</h6>
+                    <nav aria-label="breadcrumb">
+                        <ol class="breadcrumb mb-0">
+                            <li class="breadcrumb-item">
+                                <a href="{{ route('dashboard') }}" style="color: #1a3a8f; font-size: 0.78rem;">Home</a>
+                            </li>
+                            <li class="breadcrumb-item active">@yield('page-title', 'Dashboard')</li>
+                        </ol>
+                    </nav>
                 </div>
+            </div>
+
+            <div class="topbar-right">
+                <div class="btn btn-primary">{{ Auth::user()->name }}</div>
             </div>
         </div>
 
         <!-- CONTENT -->
-        <div class="content-area">
+        <div class="content-area w-100">
 
             @if (session('success'))
                 <script>
@@ -529,20 +600,36 @@
             @yield('content')
 
         </div>
-
     </div>
+
+    <!-- TOGGLE SCRIPT -->
+    <script>
+        (function () {
+            const body = document.body;
+            const toggle = document.getElementById('sidebarToggle');
+            const backdrop = document.getElementById('sidebarBackdrop');
+
+            toggle.addEventListener('click', function () {
+                body.classList.toggle('sidebar-open');
+            });
+
+            backdrop.addEventListener('click', function () {
+                body.classList.remove('sidebar-open');
+            });
+        })();
+    </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let lastEkgId = {{ \App\Models\EkgResult::latest()->first()?->id ?? 0 }};
 
         // Cek setiap 10 detik
-        setInterval(function() {
+        setInterval(function () {
             fetch(`/api/check-new-ekg?last_id=${lastEkgId}`)
                 .then(r => r.json())
                 .then(data => {
                     if (data.new_results && data.new_results.length > 0) {
-                        data.new_results.forEach(function(result) {
+                        data.new_results.forEach(function (result) {
                             showEkgNotification(result.patient_name, result.patient_code);
                             lastEkgId = result.ekg_id;
                         });
@@ -599,7 +686,7 @@
         }
 
         // Minta izin browser notification
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             if (Notification.permission === 'default') {
                 Notification.requestPermission();
             }
