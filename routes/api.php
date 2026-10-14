@@ -82,6 +82,8 @@ Route::get('result', function (Request $request) {
                 'patient_name'     => $ekg->patient->name ?? 'unknown',
                 'gender'           => $ekg->patient->gender ?? null,
                 'age'              => $ekg->patient->age ?? null,
+                'pecmaker'          => $ekg->patient->pacemaker ?? null,
+                'source'           => $ekg->patient->source ?? null,
                 'result_file_type' => $ekg->result_file_type,
                 'input_source'     => $ekg->input_source,
                 'examination_date' => $ekg->examination_date->format('Y-m-d H:i:s'),
