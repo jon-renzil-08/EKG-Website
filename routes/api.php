@@ -105,6 +105,103 @@ Route::get('result', function (Request $request) {
         ],
     ]);
 });
+// Cadangan untuk store EKG result via API.
+// Route::post('/ecg-result', function (Request $request) {
+//     if (! $request->hasFile('file')) {
+//         return response()->json(['status' => 'error', 'message' => 'No file uploaded'], 400);
+//     }
+
+//     $uploadedFile      = $request->file('file');
+//     $extension         = strtolower($uploadedFile->getClientOriginalExtension());
+//     $allowedExtensions = ['pdf', 'xml', 'dat'];
+
+//     if (! $uploadedFile->isValid() || ! in_array($extension, $allowedExtensions)) {
+//         return response()->json(['status' => 'error', 'message' => 'Invalid file type.'], 400);
+//     }
+
+//     $patientCode = $request->input('patient_id');
+//     if (! $patientCode) {
+//         return response()->json(['status' => 'error', 'message' => 'patient_id is required'], 400);
+//     }
+
+//     $examName = $request->input('exam_name');
+//     $fileType = $request->input('file_type', strtoupper($extension));
+
+//     $patientCode = $request->input('patient_code', $patientCode);
+
+//     $origin = strtoupper($request->input('origin', 'QUERY'));
+//     if (! in_array($origin, ['QUERY', 'MANUAL'])) {
+//         $origin = 'QUERY';
+//     }
+
+//     $patient = Patient::where('patient_code', $patientCode)->first();
+
+//     if (! $patient) {
+//         $genderMap = ['M' => 'Male', 'F' => 'Female'];
+//         $rawSex    = strtoupper($request->input('patient_sex', ''));
+
+//         $patient = Patient::create([
+//             'patient_code' => $patientCode,
+//             'name'         => $request->input('patient_name', 'Unknown'),
+//             'gender'       => $genderMap[$rawSex] ?? 'Unknown',
+//             'age'          => $request->input('patient_age') ?: 0,
+//             'pacemaker'    => 'No',
+//             'isInWorklist' => 2,
+//             'source'       => 'Outpatient',
+//         ]);
+
+//         Log::info("Auto-registered new patient from manual EKG entry: {$patientCode}");
+//     }
+
+//     $filename = 'Aktivo_' . now()->format('Ymd_His') . '_' . Str::slug($examName ?? 'ecg') . '_' . Str::random(6) . '.' . $extension;
+//     $path     = $uploadedFile->storeAs('public/ecg-results', $filename);
+
+//     $columnMap = [
+//         'pdf' => 'result_file_path',
+//         'xml' => 'xml_file_path',
+//         'dat' => 'dat_file_path',
+//     ];
+//     $targetColumn = $columnMap[$extension];
+
+//     $recentWindow = now()->subSeconds(60);
+
+//     $existing = EkgResult::where('patient_id', $patient->id)
+//         ->where('created_at', '>=', $recentWindow)
+//         ->whereNull($targetColumn)
+//         ->latest()
+//         ->first();
+
+//     if ($existing) {
+//         $updateData = [$targetColumn => $path];
+//         if ($extension === 'pdf') {
+//             $updateData['result_file_type'] = $fileType;
+//         }
+//         if ($origin) {
+//             $updateData['origin'] = $origin;
+//         }
+//         $existing->update($updateData);
+//         $ekgResult = $existing;
+//     } else {
+//         $data = [
+//             'patient_id'          => $patient->id,
+//             'origin'              => $origin,
+//             'examination_date'    => now(),
+//             'orthanc_instance_id' => $request->input('orthanc_instance_id'),
+//             $targetColumn         => $path,
+//         ];
+//         if ($extension === 'pdf') {
+//             $data['result_file_type'] = $fileType;
+//         }
+//         $ekgResult = EkgResult::create($data);
+//     }
+
+//     $updated = $patient->update(['isInWorklist' => 2]);
+//     Log::info('Update isInWorklist to 2 (selesai) for patient ' . $patient->patient_code . ': ' . ($updated ? 'success' : 'failed'));
+
+//     return response()->json(['status' => 'ok', 'message' => 'Result stored', 'filename' => $filename, 'ekg_id' => $ekgResult->id]);
+// });
+
+
 
 Route::post('/ecg-result', function (Request $request) {
     if (! $request->hasFile('file')) {
@@ -125,7 +222,6 @@ Route::post('/ecg-result', function (Request $request) {
     }
 
     $examName = $request->input('exam_name');
-    $fileType = $request->input('file_type', strtoupper($extension));
 
     $patientCode = $request->input('patient_code', $patientCode);
 
@@ -173,33 +269,38 @@ Route::post('/ecg-result', function (Request $request) {
 
     if ($existing) {
         $updateData = [$targetColumn => $path];
-        if ($extension === 'pdf') {
-            $updateData['result_file_type'] = $fileType;
-        }
         if ($origin) {
             $updateData['origin'] = $origin;
         }
         $existing->update($updateData);
         $ekgResult = $existing;
     } else {
-        $data = [
+        $ekgResult = EkgResult::create([
             'patient_id'          => $patient->id,
             'origin'              => $origin,
             'examination_date'    => now(),
             'orthanc_instance_id' => $request->input('orthanc_instance_id'),
             $targetColumn         => $path,
-        ];
-        if ($extension === 'pdf') {
-            $data['result_file_type'] = $fileType;
-        }
-        $ekgResult = EkgResult::create($data);
+        ]);
     }
+
+    // result_file_type = daftar format yang ada di record ini, mis. "PDF", "PDF,XML", "PDF,XML,DAT".
+    // Dihitung ulang tiap ada file masuk, karena PDF/XML/DAT dari 1 pemeriksaan digabung di 1 row.
+    $ekgResult->refresh();
+    $ekgResult->update([
+        'result_file_type' => collect([
+            $ekgResult->result_file_path ? 'PDF' : null,
+            $ekgResult->xml_file_path    ? 'XML' : null,
+            $ekgResult->dat_file_path    ? 'DAT' : null,
+        ])->filter()->implode(','),
+    ]);
 
     $updated = $patient->update(['isInWorklist' => 2]);
     Log::info('Update isInWorklist to 2 (selesai) for patient ' . $patient->patient_code . ': ' . ($updated ? 'success' : 'failed'));
 
     return response()->json(['status' => 'ok', 'message' => 'Result stored', 'filename' => $filename, 'ekg_id' => $ekgResult->id]);
 });
+
 
 Route::get('/check-new-ekg', function (Request $request) {
     $lastId = $request->query('last_id', 0);
