@@ -213,7 +213,7 @@
                 Mengirim...
             `;
 
-                    fetch(`/send-to-worklist/${patientId}`, {
+                    fetch(`/api/send-to-worklist/${patientId}`, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',

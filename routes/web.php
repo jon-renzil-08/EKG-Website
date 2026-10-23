@@ -101,27 +101,27 @@ Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard
     Route::get('/jumbotron/', [JumbotronController::class, 'index'])->name('jumbotron.index');
     Route::post('/jumbotron/', [JumbotronController::class, 'store'])->name('jumbotron.save');
 
-    // Routes for sending patient data to Worklist Server
-    Route::post('/send-to-worklist/{id}', function (Request $request, $id) {
-        $patient = Patient::find($id);
+    // // Routes for sending patient data to Worklist Server
+    // Route::post('/send-to-worklist/{id}', function (Request $request, $id) {
+    //     $patient = Patient::find($id);
 
-        if (!$patient) {
-          return response()->json([
-		'success' => false,
-		'message' => 'Pasien tidak ditemukan.'
-	  ], 404);
-        }
+    //     if (!$patient) {
+    //       return response()->json([
+	// 	'success' => false,
+	// 	'message' => 'Pasien tidak ditemukan.'
+	//   ], 404);
+    //     }
 
-        $patient->isInWorklist = 1;
-        $patient->save();
+    //     $patient->isInWorklist = 1;
+    //     $patient->save();
 
 
-        return response()->json([
-              'success' => true,
-              'message' => 'Pasien berhasil ditambahkan ke worklist.',
+    //     return response()->json([
+    //           'success' => true,
+    //           'message' => 'Pasien berhasil ditambahkan ke worklist.',
 
-        ]);
-    });
+    //     ]);
+    // });
 
 
 
