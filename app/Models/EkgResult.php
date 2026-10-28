@@ -13,13 +13,13 @@ class EkgResult extends Model
 
     protected $fillable = [
         'patient_id',
-        'origin',
         'result_file_path',
         'result_file_type',
         'xml_file_path',
         'dat_file_path',
         'examination_date',
         'orthanc_instance_id',
+        'device_no'
     ];
 
     protected $casts = [
