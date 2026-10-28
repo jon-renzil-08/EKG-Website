@@ -14,6 +14,7 @@ class EkgController extends Controller
     public function index(Request $request)
     {
         $query = EkgResult::with('patient');
+        
 
         if ($request->has('search') && $request->search != '') {
             $search = $request->search;

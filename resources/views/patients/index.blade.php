@@ -86,13 +86,13 @@
                                             </td>
                                             <td class="text-nowrap">
                                                 <div class="d-flex align-items-center gap-1">
-                                                    @if ($patient->isInWorklist === 0)
+                                                    {{-- @if ($patient->isInWorklist === 0)
                                                         <button class="btn btn-sm btn-primary send-to-worklist pulse-btn"
                                                             data-id="{{ $patient->id }}">
                                                             <i class="fas fa-heartbeat me-1"></i>
                                                             Kirim EKG
                                                         </button>
-                                                    @endif
+                                                    @endif --}}
 
                                                     <a href="{{ route('patients.edit', $patient) }}"
                                                         class="btn btn-sm btn-outline-warning" data-bs-toggle="tooltip"

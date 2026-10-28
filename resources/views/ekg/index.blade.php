@@ -33,7 +33,7 @@
                                         <th style="font-weight: bold; color: black;">Result EKG</th>
                                         <th style="font-weight: bold; color: black;">Examination Date</th>
                                         <th style="font-weight: bold; color: black;">Status</th>
-                                        <th style="font-weight: bold; color: black;">Information</th>
+                                        <th style="font-weight: bold; color: black;">EKG Device No</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -88,19 +88,9 @@
                                                 @endif
                                             </td>
 
-                                            <td>
-                                                @if ($ekg->origin === 'QUERY')
-                                                    <span class="badge bg-primary p-2">
-                                                        <i class="fas fa-list me-1"></i> Otomatis EKG
-                                                    </span>
-                                                @elseif ($ekg->origin === 'MANUAL')
-                                                    <span class="badge bg-secondary p-2">
-                                                        <i class="fas fa-keyboard me-1"></i> Manual EKG
-                                                    </span>
-                                                @else
-                                                    <span class="text-muted">-</span>
-                                                @endif
-                                            </td>
+
+                                            <td>{{ $ekg->device_no ?? '-' }}</td>
+
 
                                         </tr>
                                     @empty
