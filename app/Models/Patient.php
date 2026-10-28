@@ -24,16 +24,23 @@ class Patient extends Model
     protected static function booted()
     {
         static::creating(function ($patient) {
-            if (! empty($patient->patient_code)) {
+            // Otomatis masuk worklist kalau status belum ditentukan
+            if ($patient->isInWorklist === null) {
+                $patient->isInWorklist = 1;
+            }
+
+            // Kode sudah diisi (mis. dari alat EKG atau SIMRS): jangan diubah
+            if (!empty($patient->patient_code)) {
                 return;
             }
 
-            $prefix = 'KSM-';
+            $prefix = 'P';
 
             $lastCode = Patient::withTrashed()
-                ->where('patient_code', 'like', $prefix . '%')
+                ->whereRaw('patient_code REGEXP ?', ['^' . $prefix . '[0-9]+$'])
                 ->orderByRaw(
-                    'CAST(SUBSTRING(patient_code, ' . (strlen($prefix) + 1) . ') AS UNSIGNED) DESC'
+                    'CAST(SUBSTRING(patient_code, ?) AS UNSIGNED) DESC',
+                    [strlen($prefix) + 1]
                 )
                 ->value('patient_code');
 
