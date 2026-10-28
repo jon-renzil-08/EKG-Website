@@ -29,8 +29,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
 
-// Routes for the web application
-Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    // Routes for the web application
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     // Routes for Patients
     Route::resource('patients', PatientController::class);
@@ -41,12 +41,9 @@ Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard
     // Routes for OxiMonitor
     Route::resource('oximonitor', OximonitorController::class)->only(['index']);
 
-    // Routes for download EKG result
-    // Route::get('/ekg/download/{id}', [EkgController::class, 'download'])->name('ekg.download');
 
-
-
-    Route::get('/ekg/download/{id}/{type}', function($id, $type) {
+    // Routes for ECG Download
+    Route::get('/ekg/download/{id}/{type}', function ($id, $type) {
         $ekg = EkgResult::findOrFail($id);
 
         $type = strtolower($type);
@@ -69,28 +66,28 @@ Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard
         }
 
         $patient = Patient::withTrashed()->find($ekg->patient_id);
-        $patientId   = $patient ? $patient->patient_code : 'unknown';
+        $patientId = $patient ? $patient->patient_code : 'unknown';
         $patientName = $patient ? str_replace(' ', '_', $patient->name) : 'unknown';
 
         if ($type === 'xml') {
-            return response()->download($filePath, "Klinik_Shanata_{$patientName}_{$patientId}.xml", [
+            return response()->download($filePath, "Hasil_EKG_{$patientName}_{$patientId}.xml", [
                 'Content-Type' => 'application/xml'
             ]);
         }
 
         if ($type === 'dat') {
-            return response()->download($filePath, "Klinik_Shanata_{$patientName}_{$patientId}.dat", [
+            return response()->download($filePath, "Hasil_EKG_{$patientName}_{$patientId}.dat", [
                 'Content-Type' => 'application/octet-stream'
             ]);
         }
 
         // PDF (default)
-        $enhancer     = new EcgPdfEnhancer();
+        $enhancer = new EcgPdfEnhancer();
         $enhancedPath = $enhancer->enhance($filePath);
 
         return response()->download(
             $enhancedPath,
-            "Klinik_Shanata_{$patientName}_{$patientId}.pdf",
+            "Hasil_EKG_{$patientName}_{$patientId}.pdf",
             ['Content-Type' => 'application/pdf']
         )->deleteFileAfterSend(true);
 
@@ -101,36 +98,11 @@ Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard
     Route::get('/jumbotron/', [JumbotronController::class, 'index'])->name('jumbotron.index');
     Route::post('/jumbotron/', [JumbotronController::class, 'store'])->name('jumbotron.save');
 
-    // // Routes for sending patient data to Worklist Server
-    // Route::post('/send-to-worklist/{id}', function (Request $request, $id) {
-    //     $patient = Patient::find($id);
-
-    //     if (!$patient) {
-    //       return response()->json([
-	// 	'success' => false,
-	// 	'message' => 'Pasien tidak ditemukan.'
-	//   ], 404);
-    //     }
-
-    //     $patient->isInWorklist = 1;
-    //     $patient->save();
-
-
-    //     return response()->json([
-    //           'success' => true,
-    //           'message' => 'Pasien berhasil ditambahkan ke worklist.',
-
-    //     ]);
-    // });
-
-
-
-
-   // Routes test-heart
-   Route::get('/test-heart', function () {
-      broadcast(new HeartRateUpdated(rand(60, 100)));
-      return "broadcast sent";
-   });
+    // Routes test-heart
+    Route::get('/test-heart', function () {
+        broadcast(new HeartRateUpdated(rand(60, 100)));
+        return "broadcast sent";
+    });
 
 });
 
