@@ -27,16 +27,112 @@ Route::middleware('auth:sanctum')->group(function () {
 
 });
 
-// GET Patients API
-Route::get('/patients', function () {
-    $patients = Patient::latest()->get();
+Route::middleware('no.browser')->group(function () {
 
-    return response()->json([
-        'success' => true,
-        'message' => 'Data pasien berhasil diambil.',
-        'data' => $patients,
-    ]);
+    // GET Patients API
+    Route::get('/patients', function () {
+        $patients = Patient::latest()->get();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Data pasien berhasil diambil.',
+            'data' => $patients,
+        ]);
+    });
+
+    // GET Worklist API
+    Route::get('/worklist', function (Request $request) {
+        $patientId = $request->query('patient_id');
+
+        $query = Patient::where('isInWorklist', 1);
+
+        if ($patientId) {
+            $query->where('patient_code', $patientId);
+        }
+
+        $patients = $query->get();
+
+        if ($patients->isEmpty()) {
+            return response()->json(['code' => 0, 'data' => null]);
+        }
+
+        return response()->json([
+            'code' => 1,
+            'data' => $patients->map(function ($p) {
+                return [
+                    'PatientID' => (string) $p->patient_code,
+                    'PatientName' => $p->name,
+                    'PatientSex' => $p->gender === 'Male' ? 'M' : ($p->gender === 'Female' ? 'F' : 'O'),
+                    'PatientAge' => (string) $p->age,
+                    'Pacemaker' => $p->pacemaker === 'Yes' ? 'Yes' : 'No',
+                    'Source' => $p->source, // harus: "Inpatient", "Outpatient", atau "Physical Exam"
+                    'RequestDate' => $p->created_at ? $p->created_at->format('Y-m-d H:i:s') : null,
+                ];
+            }),
+        ]);
+    });
+
+    // GET ECG Result API
+    Route::get('/result', function (Request $request) {
+        $results = EkgResult::with('patient')
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'status' => 'ok',
+            'data' => $results->map(function ($ekg) {
+                return [
+                    'id' => $ekg->id,
+                    'device_no' => $ekg->device_no,
+                    'patient_code' => $ekg->patient->patient_code ?? 'unknown',
+                    'patient_name' => $ekg->patient->name ?? 'unknown',
+                    'gender' => $ekg->patient->gender ?? null,
+                    'age' => $ekg->patient->age ?? null,
+                    'pacemaker' => $ekg->patient->pacemaker ?? null,
+                    'source' => $ekg->patient->source ?? null,
+                    'result_file_type' => $ekg->result_file_type,
+                    'examination_date' => $ekg->examination_date
+                        ? $ekg->examination_date->format('Y-m-d H:i:s')
+                        : null,
+                    'pdf_url' => $ekg->result_file_path
+                        ? url("/ekg/download/{$ekg->id}/pdf")
+                        : null,
+                    'xml_url' => $ekg->xml_file_path
+                        ? url("/ekg/download/{$ekg->id}/xml")
+                        : null,
+                    'dat_url' => $ekg->dat_file_path
+                        ? url("/ekg/download/{$ekg->id}/dat")
+                        : null,
+                ];
+            }),
+        ]);
+    });
+
+    // GET Check New EKG
+    Route::get('/check-new-ekg', function (Request $request) {
+        $lastId = $request->query('last_id', 0);
+
+        $newResults = EkgResult::with('patient')
+            ->where('id', '>', $lastId)
+            ->latest()
+            ->get()
+            ->map(function ($ekg) {
+                return [
+                    'ekg_id' => $ekg->id,
+                    'patient_name' => $ekg->patient->name ?? 'Unknown',
+                    'patient_code' => $ekg->patient->patient_code ?? '-',
+                    'exam_date' => $ekg->examination_date,
+                ];
+            });
+
+        return response()->json([
+            'new_results' => $newResults,
+            'last_id' => $newResults->max('ekg_id') ?? $lastId,
+        ]);
+    });
+
 });
+
 
 // Routes for create Patient API
 Route::post('/patients', function (Request $request) {
@@ -64,97 +160,6 @@ Route::post('/patients', function (Request $request) {
         'message' => 'Pasien berhasil ditambahkan.',
         'data' => $patient,
     ], 201);
-});
-
-// Routes Worklist API
-Route::get('/worklist', function (Request $request) {
-    $patientId = $request->query('patient_id');
-
-    $query = Patient::where('isInWorklist', 1);
-
-    if ($patientId) {
-        $query->where('patient_code', $patientId);
-    }
-
-    $patients = $query->get();
-
-    if ($patients->isEmpty()) {
-        return response()->json(['code' => 0, 'data' => null]);
-    }
-
-    return response()->json([
-        'code' => 1,
-        'data' => $patients->map(function ($p) {
-            return [
-                'PatientID' => (string) $p->patient_code,
-                'PatientName' => $p->name,
-                'PatientSex' => $p->gender === 'Male' ? 'M' : ($p->gender === 'Female' ? 'F' : 'O'),
-                'PatientAge' => (string) $p->age,
-                'Pacemaker' => $p->pacemaker === 'Yes' ? 'Yes' : 'No',
-                'Source' => $p->source, // harus: "Inpatient", "Outpatient", atau "Physical Exam"
-                'RequestDate' => $p->created_at ? $p->created_at->format('Y-m-d H:i:s') : null,
-            ];
-        }),
-    ]);
-});
-
-// Routes for sending patient data to Worklist API
-Route::post('/send-to-worklist/{id}', function (Request $request, $id) {
-    $patient = Patient::find($id);
-
-    if (!$patient) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Pasien tidak ditemukan.'
-        ], 404);
-    }
-
-    $patient->isInWorklist = 1;
-    $patient->save();
-
-
-    return response()->json([
-        'success' => true,
-        'message' => 'Pasien berhasil ditambahkan ke worklist.',
-        'data' => $patient
-    ]);
-});
-
-
-// Routes ECG Result API
-Route::get('/result', function (Request $request) {
-    $results = EkgResult::with('patient')
-        ->latest()
-        ->get();
-
-    return response()->json([
-        'status' => 'ok',
-        'data' => $results->map(function ($ekg) {
-            return [
-                'id' => $ekg->id,
-                'device_no' => $ekg->device_no,
-                'patient_code' => $ekg->patient->patient_code ?? 'unknown',
-                'patient_name' => $ekg->patient->name ?? 'unknown',
-                'gender' => $ekg->patient->gender ?? null,
-                'age' => $ekg->patient->age ?? null,
-                'pacemaker' => $ekg->patient->pacemaker ?? null,
-                'source' => $ekg->patient->source ?? null,
-                'result_file_type' => $ekg->result_file_type,
-                'examination_date' => $ekg->examination_date
-                    ? $ekg->examination_date->format('Y-m-d H:i:s')
-                    : null,
-                'pdf_url' => $ekg->result_file_path
-                    ? url("/ekg/download/{$ekg->id}/pdf")
-                    : null,
-                'xml_url' => $ekg->xml_file_path
-                    ? url("/ekg/download/{$ekg->id}/xml")
-                    : null,
-                'dat_url' => $ekg->dat_file_path
-                    ? url("/ekg/download/{$ekg->id}/dat")
-                    : null,
-            ];
-        }),
-    ]);
 });
 
 
@@ -256,26 +261,26 @@ Route::post('/ecg-result', function (Request $request) {
 });
 
 
-
+// Route to handle file upload for SIMRS
 Route::post('/send-to-simrs', function (Request $request) {
     $validated = $request->validate([
         'patient_code' => 'required|string|max:255',
-        'file'         => 'required|file',
-        'device_no'    => 'nullable|string|max:255',
+        'file' => 'required|file',
+        'device_no' => 'nullable|string|max:255',
     ]);
 
     $uploadedFile = $request->file('file');
-    $extension    = strtolower($uploadedFile->getClientOriginalExtension());
+    $extension = strtolower($uploadedFile->getClientOriginalExtension());
 
-    if (! in_array($extension, ['pdf', 'xml', 'dat'])) {
+    if (!in_array($extension, ['pdf', 'xml', 'dat'])) {
         return response()->json(['status' => 'error', 'message' => 'Invalid file type.'], 400);
     }
 
     $patientCode = $validated['patient_code'];
-    $deviceNo    = $validated['device_no'] ?? null;
+    $deviceNo = $validated['device_no'] ?? null;
 
     $filename = 'Hasil_EKG_' . now()->format('Ymd_His') . '_' . Str::slug('ecg') . '_' . Str::random(6) . '.' . $extension;
-    $path     = $uploadedFile->storeAs('public/ecg-results-simrs', $filename);
+    $path = $uploadedFile->storeAs('public/ecg-results-simrs', $filename);
 
     $columnMap = [
         'pdf' => 'result_file_path',
@@ -293,17 +298,17 @@ Route::post('/send-to-simrs', function (Request $request) {
 
     if ($existing) {
         $updateData = [$targetColumn => $path];
-        if ($deviceNo && ! $existing->device_no) {
+        if ($deviceNo && !$existing->device_no) {
             $updateData['device_no'] = $deviceNo;
         }
         $existing->update($updateData);
         $record = $existing;
     } else {
         $record = SimrsResult::create([
-            'patient_code'     => $patientCode,
-            'device_no'        => $deviceNo,
+            'patient_code' => $patientCode,
+            'device_no' => $deviceNo,
             'examination_date' => now(),
-            $targetColumn      => $path,
+            $targetColumn => $path,
         ]);
     }
 
@@ -311,39 +316,20 @@ Route::post('/send-to-simrs', function (Request $request) {
     $record->update([
         'result_file_type' => collect([
             $record->result_file_path ? 'PDF' : null,
-            $record->xml_file_path    ? 'XML' : null,
-            $record->dat_file_path    ? 'DAT' : null,
+            $record->xml_file_path ? 'XML' : null,
+            $record->dat_file_path ? 'DAT' : null,
         ])->filter()->implode(','),
     ]);
 
     return response()->json([
-        'status'   => 'ok',
-        'message'  => 'Result stored',
+        'status' => 'ok',
+        'message' => 'Result stored',
         'filename' => $filename,
-        'ekg_id'   => $record->id,
+        'ekg_id' => $record->id,
     ]);
 });
 
-Route::get('/check-new-ekg', function (Request $request) {
-    $lastId = $request->query('last_id', 0);
 
-    $newResults = EkgResult::with('patient')
-        ->where('id', '>', $lastId)
-        ->latest()
-        ->get()
-        ->map(function ($ekg) {
-            return [
-                'ekg_id' => $ekg->id,
-                'patient_name' => $ekg->patient->name ?? 'Unknown',
-                'patient_code' => $ekg->patient->patient_code ?? '-',
-                'exam_date' => $ekg->examination_date,
-            ];
-        });
 
-    return response()->json([
-        'new_results' => $newResults,
-        'last_id' => $newResults->max('ekg_id') ?? $lastId,
-    ]);
-});
 
 
