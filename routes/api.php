@@ -178,9 +178,14 @@ Route::post('/ecg-result', function (Request $request) {
         return response()->json(['status' => 'error', 'message' => 'Invalid file type.'], 400);
     }
 
-    $patientCode = $request->input('patient_id');
+    $patientCode = $request->input('patient_code')
+        ?? $request->input('patient_id');
+
     if (!$patientCode) {
-        return response()->json(['status' => 'error', 'message' => 'patient_id is required'], 400);
+        return response()->json([
+            'status' => 'error',
+            'message' => 'patient_code or patient_id is required'
+        ], 400);
     }
 
     $examName = $request->input('exam_name');
