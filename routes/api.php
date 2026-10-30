@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\WorklistController;
+use App\Http\Controllers\EkgQueryController;
 use App\Http\Controllers\PatientController;
 use App\Models\EkgResult;
 use App\Models\Patient;
@@ -200,7 +201,7 @@ Route::post('/ecg-result', function (Request $request) {
             'gender' => $genderMap[$rawSex] ?? 'Unknown',
             'age' => $request->input('patient_age') ?: 0,
             'pacemaker' => 'No',
-            'isInWorklist' => 2,
+            'isInWorklist' => 1,
             'source' => 'Outpatient',
         ]);
 
@@ -328,6 +329,10 @@ Route::post('/send-to-simrs', function (Request $request) {
         'ekg_id' => $record->id,
     ]);
 });
+
+
+// Route Dawei EKG Direct Query API
+Route::post('/query', [EkgQueryController::class, 'query']);
 
 
 

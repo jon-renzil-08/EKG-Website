@@ -14,7 +14,7 @@ class EkgController extends Controller
     public function index(Request $request)
     {
         $query = EkgResult::with('patient');
-        
+
 
         if ($request->has('search') && $request->search != '') {
             $search = $request->search;
@@ -56,23 +56,6 @@ class EkgController extends Controller
         return redirect()->route('ekg.index')->with('success', 'EKG result created successfully');
     }
 
-    // Di EkgController
-// public function download($instanceId)
-// {
-//     $response = Http::get(
-//         "http://127.0.0.1:8042/instances/{$instanceId}/pdf"
-//     );
-
-    //     if (!$response->successful()) {
-//         abort(404, 'PDF tidak ditemukan di Orthanc.');
-//     }
-
-    //     return response($response->body(), 200, [
-//         'Content-Type' => 'application/pdf',
-//         'Content-Disposition' => 'attachment; filename="hasil_ekg.pdf"',
-//     ]);
-// }
-
     public function destroy(EkgResult $ekg)
     {
         if ($ekg->result_file_path && Storage::disk('public')->exists($ekg->result_file_path)) {
@@ -82,5 +65,103 @@ class EkgController extends Controller
         $ekg->delete();
 
         return redirect()->route('ekg.index')->with('success', 'EKG result deleted successfully');
+    }
+
+
+    public function query(Request $request)
+    {
+        try {
+            // 1. Ambil XML dari alat EKG
+            $xmlData = $request->getContent();
+
+            // 2. Parse XML
+            $xml = simplexml_load_string($xmlData);
+
+            if ($xml === false) {
+                throw new \Exception('Invalid XML request');
+            }
+
+            // 3. Ambil PatientID dan DeviceID
+            $patientId = (string) $xml->PatientID;
+            $deviceId = (string) $xml->DeviceID;
+
+            Log::info('Dawei Query Request', [
+                'patient_id' => $patientId,
+                'device_id' => $deviceId,
+            ]);
+
+            // 4. Ambil data pasien dari database
+            $patients = Patient::where('isInWorklist', 1)
+                ->where('patient_code', $patientId)
+                ->get();
+
+            // 5. Jika pasien tidak ditemukan
+            if ($patients->isEmpty()) {
+                $response = new \SimpleXMLElement(
+                    '<?xml version="1.0" encoding="UTF-8"?><Error/>'
+                );
+
+                $response->addAttribute('message', 'Patient not found');
+
+                return response($response->asXML(), 200)
+                    ->header('Content-Type', 'application/xml');
+            }
+
+            // 6. Buat XML response
+            $root = new \SimpleXMLElement('<root/>');
+
+            $root->addChild('Code', '1');
+            $root->addChild('Message', '');
+
+            $records = $root->addChild('records');
+
+            foreach ($patients as $index => $patient) {
+                $rows = $records->addChild('rows');
+
+                $rows->addChild('SerialNo', $index + 1);
+                $rows->addChild('PatientID', htmlspecialchars($patient->patient_code));
+                $rows->addChild('PatientName', htmlspecialchars($patient->name));
+                $rows->addChild('PatientSex', $patient->gender === 'Male' ? 'M' : ($patient->gender === 'Female' ? 'F' : 'O'));
+                $rows->addChild('PatientAge', $patient->age);
+                $rows->addChild('PatientAgeUnit', 'Y');
+                $rows->addChild('PatientBirthDate', '');
+                $rows->addChild('RequestDepartment', '');
+                $rows->addChild('RequestID', '');
+                $rows->addChild('SickBedNo', '');
+                $rows->addChild('Pacemaker', $patient->pacemaker === 'Yes' ? '1' : '2');
+
+                $sourceMap = [
+                    'Outpatient' => '0',
+                    'Inpatient' => '1',
+                    'Physical Exam' => '2',
+                ];
+
+                $rows->addChild(
+                    'PatientSource',
+                    $sourceMap[$patient->source] ?? '1'
+                );
+
+                $rows->addChild('ExamDepartment', '');
+                $rows->addChild('Priority', '');
+                $rows->addChild('fileGuid', '');
+                $rows->addChild(
+                    'RequestDate',
+                    $patient->created_at?->format('Y-m-d H:i:s') ?? ''
+                );
+            }
+
+            // 7. Kirim XML ke alat EKG
+            return response($root->asXML(), 200)
+                ->header('Content-Type', 'application/xml');
+
+        } catch (\Throwable $e) {
+            Log::error('Dawei Query Error: ' . $e->getMessage());
+
+            $error = new \SimpleXMLElement('<Error/>');
+            $error->addAttribute('message', $e->getMessage());
+
+            return response($error->asXML(), 500)
+                ->header('Content-Type', 'application/xml');
+        }
     }
 }
