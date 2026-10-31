@@ -60,6 +60,7 @@ class EkgQueryController extends Controller
         if (trim($xml) === '') {
             return null;
         }
+
         try {
             $prevSetting = libxml_use_internal_errors(true);
             $root = simplexml_load_string($xml);
@@ -68,8 +69,17 @@ class EkgQueryController extends Controller
             if ($root === false) {
                 return null;
             }
-            $value = (string) $root->PatientID;
-            return $value !== '' ? $value : null;
+
+            // Format: <root><query><PatientID>P0001</PatientID></query></root>
+            $value = (string) ($root->query->PatientID ?? '');
+
+            // Fallback untuk format PatientID langsung di dalam root
+            if ($value === '') {
+                $value = (string) ($root->PatientID ?? '');
+            }
+
+            return trim($value) !== '' ? trim($value) : null;
+
         } catch (\Throwable $e) {
             Log::warning('Gagal parse PatientID dari XML device: ' . $e->getMessage());
             return null;
@@ -109,22 +119,22 @@ class EkgQueryController extends Controller
                 . '<PatientName>' . e($p->name) . '</PatientName>'
                 . '<PatientSex>' . e($sex) . '</PatientSex>'
                 . '<PatientAge>' . e((string) $p->age) . '</PatientAge>'
-                . '<PatientAgeUnit>Y</PatientAgeUnit>'
-                . '<PatientBirthDate></PatientBirthDate>'
-                . '<RequestDepartment></RequestDepartment>'
+                // . '<PatientAgeUnit>Y</PatientAgeUnit>'
+                // . '<PatientBirthDate></PatientBirthDate>'
+                // . '<RequestDepartment></RequestDepartment>'
                 . '<RequestID>' . e('ECG' . $p->patient_code) . '</RequestID>'
                 . '<SickBedNo></SickBedNo>'
                 . '<Pacemaker>' . $pacemakerCode . '</Pacemaker>'
                 . '<PatientSource>' . $sourceCode . '</PatientSource>'
-                . '<ExamDepartment></ExamDepartment>'
-                . '<Priority></Priority>'
-                . '<fileGuid></fileGuid>'
+                // . '<ExamDepartment></ExamDepartment>'
+                // . '<Priority></Priority>'
+                // . '<fileGuid></fileGuid>'
                 . '<RequestDate>' . $p->created_at->format('Ymd') . '</RequestDate>'
                 . '</rows>';
         }
 
         $xml = '<?xml version="1.0" encoding="UTF-8"?>'
-            . '<root><Code>1</Code><Message></Message><records>' . $rowsXml . '</records></root>';
+            . '<root><Code>1</Code><Message>Success</Message><records>' . $rowsXml . '</records></root>';
 
         return response($xml, 200)->header('Content-Type', 'application/xml');
     }
