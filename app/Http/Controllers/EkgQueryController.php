@@ -42,7 +42,7 @@ class EkgQueryController extends Controller
             // Fallback terakhir untuk EkgReceiveController kalau ekstraksi file gagal.
             // Hanya disimpan kalau pasien memang ada di worklist, supaya ID salah ketik
             // tidak ikut tersimpan.
-            Cache::put('ekg_last_queried_patient_id', $patientId, now()->addMinutes(2));
+            Cache::forever('ekg_last_queried_patient_id', $patientId);
 
             return $this->worklistXmlResponse($patients);
 
@@ -107,14 +107,13 @@ class EkgQueryController extends Controller
 
             // Cache data pasien ini, dipakai EkgReceiveController untuk fallback
             // age/name/sex kalau nanti device kirim XML hasil EKG tanpa info itu.
-            Cache::put("ekg_patient_data:{$p->patient_code}", [
+            Cache::forever("ekg_patient_data:{$p->patient_code}", [
                 'patient_name' => $p->name,
                 'patient_sex' => $sex,
                 'patient_age' => (string) $p->age,
-            ], now()->addMinutes(15));
+            ]);
 
             $rowsXml .= '<rows>'
-                . '<SerialNo>' . e($p->patient_code) . '</SerialNo>'
                 . '<PatientID>' . e($p->patient_code) . '</PatientID>'
                 . '<PatientName>' . e($p->name) . '</PatientName>'
                 . '<PatientSex>' . e($sex) . '</PatientSex>'
@@ -122,8 +121,8 @@ class EkgQueryController extends Controller
                 // . '<PatientAgeUnit>Y</PatientAgeUnit>'
                 // . '<PatientBirthDate></PatientBirthDate>'
                 // . '<RequestDepartment></RequestDepartment>'
-                . '<RequestID>' . e('ECG' . $p->patient_code) . '</RequestID>'
-                . '<SickBedNo></SickBedNo>'
+                // . '<RequestID>' . e('ECG' . $p->patient_code) . '</RequestID>'
+                // . '<SickBedNo></SickBedNo>'
                 . '<Pacemaker>' . $pacemakerCode . '</Pacemaker>'
                 . '<PatientSource>' . $sourceCode . '</PatientSource>'
                 // . '<ExamDepartment></ExamDepartment>'
@@ -132,7 +131,9 @@ class EkgQueryController extends Controller
                 . '<RequestDate>' . $p->created_at->format('Ymd') . '</RequestDate>'
                 . '</rows>';
         }
-
+        Log::info('[QUERY] Cache patient ID:', [
+            'patient_id' => Cache::get('ekg_last_queried_patient_id')
+        ]);
         $xml = '<?xml version="1.0" encoding="UTF-8"?>'
             . '<root><Code>1</Code><Message>Success</Message><records>' . $rowsXml . '</records></root>';
 
