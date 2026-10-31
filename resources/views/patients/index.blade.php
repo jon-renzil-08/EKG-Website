@@ -50,7 +50,7 @@
                                             {{-- <td style="font-weight: bold;">{{ $patient->patient_code }}</td> --}}
 
                                             <td style="font-weight: bold; color: black;">
-                                            {{ $patient->patient_code }}
+                                                {{ $patient->patient_code }}
                                             </td>
                                             <td>{{ ucwords(strtolower($patient->name)) }}</td>
                                             <td>{{ $patient->age }}</td>
@@ -70,17 +70,13 @@
                                                 <span class="badge bg-info">{{ $patient->source }}</span>
                                             </td>
                                             <td>
-                                                @if ($patient->isInWorklist === 2)
+                                                @if ($patient->ekgResults()->exists())
                                                     <span class="badge bg-success p-2">
                                                         <i class="fas fa-check-circle me-1"></i> Selesai EKG
                                                     </span>
-                                                @elseif ($patient->isInWorklist === 1)
+                                                @else
                                                     <span class="badge bg-warning p-2">
                                                         <i class="fas fa-clock me-1"></i> Dalam Antrian
-                                                    </span>
-                                                @else
-                                                    <span class="badge bg-danger p-2">
-                                                        <i class="fas fa-times-circle me-1"></i> Belum Dikirim
                                                     </span>
                                                 @endif
                                             </td>
@@ -249,5 +245,4 @@
             });
         });
     </script>
-
 @endsection

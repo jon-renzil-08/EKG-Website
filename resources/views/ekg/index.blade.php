@@ -72,21 +72,19 @@
                                                 @endif
                                             </td>
                                             <td>{{ $ekg->examination_date->format('d/m/Y H:i') }}</td>
+
                                             <td>
-                                                @if ($ekg->patient->isInWorklist === 2)
+                                                @if ($ekg->patient->ekgResults()->exists())
                                                     <span class="badge bg-success p-2">
                                                         <i class="fas fa-check-circle me-1"></i> Selesai EKG
                                                     </span>
-                                                @elseif ($ekg->patient->isInWorklist === 1)
+                                                @else
                                                     <span class="badge bg-warning p-2">
                                                         <i class="fas fa-clock me-1"></i> Dalam Antrian
                                                     </span>
-                                                @else
-                                                    <span class="badge bg-danger p-2">
-                                                        <i class="fas fa-times-circle me-1"></i> Belum Dikirim
-                                                    </span>
                                                 @endif
                                             </td>
+
 
 
                                             <td>{{ $ekg->device_no ?? '-' }}</td>
