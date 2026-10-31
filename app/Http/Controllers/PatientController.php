@@ -46,7 +46,7 @@ class PatientController extends Controller
             'gender' => $request['gender'],
             'pacemaker' => $request['pacemaker'],
             'source' => $request['source'],
-            'isInWorklist' => false,
+            'isInWorklist' => 1,
         ]);
         return redirect()->route('patients.index')->with('success', 'Patient created successfully');
     }
