@@ -17,29 +17,46 @@ class EkgReceiveController extends Controller
     public function receive(Request $request)
     {
         try {
-            $rawBody = $request->getContent();
+            $incoming = $this->saveIncomingFile($request);
 
-            // Body kosong = ini "Test Network" dari device, bukan upload sungguhan
-            if (strlen($rawBody) === 0) {
+            if ($incoming === null) {
                 Log::info('Network test request - no file to process');
+
                 return $this->xmlResponse(1, 'Network test success');
             }
 
-            $filename = $this->getFilenameFromRequest($request);
+            $rawBody = $incoming['rawBody'];
+            $filename = $incoming['filename'];
+            $savedPath = $incoming['savedPath'];
+
             $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+
             Log::info("[RECEIVE] Filename: {$filename}, size: " . strlen($rawBody) . ' bytes');
 
-            $savedPath = $this->saveIncomingFile($rawBody, $filename);
-
             $payloadType = $this->classifyPayload($extension);
+
+            if ($payloadType === 'UNKNOWN') {
+                throw new \RuntimeException(
+                    'Unsupported file type. Allowed: PDF, XML, DAT.'
+                );
+            }
+
             Log::info("[CLASSIFY] Payload type: {$payloadType}");
 
-            $this->routeToHis($payloadType, $rawBody, $filename, $savedPath);
+            // Proses file beserta data request
+            $this->routeToHis(
+                $payloadType,
+                $rawBody,
+                $filename,
+                $savedPath,
+                $request
+            );
 
             return $this->xmlResponse(1, 'Upload successful');
 
         } catch (\Throwable $e) {
             Log::error('Receive error: ' . $e->getMessage());
+
             return $this->xmlResponse(-1, $e->getMessage());
         }
     }
@@ -76,11 +93,90 @@ class EkgReceiveController extends Controller
         };
     }
 
-    private function saveIncomingFile(string $rawBody, string $filename): string
+    private function saveIncomingFile(Request $request): ?array
     {
-        $path = 'ekg-incoming/' . now()->format('Ymd_His') . '_' . Str::random(6) . '_' . $filename;
-        Storage::disk('local')->put($path, $rawBody);
-        return $path;
+        $uploadedFile = $this->findUploadedFile($request->allFiles());
+
+        $isMultipart = str_contains(
+            strtolower($request->header('Content-Type', '')),
+            'multipart/form-data'
+        );
+
+        if ($uploadedFile) {
+            // Upload multipart/form-data
+            $rawBody = file_get_contents($uploadedFile->getRealPath());
+            $filename = $uploadedFile->getClientOriginalName();
+
+        } else {
+            // Upload raw binary
+            $rawBody = $request->getContent();
+
+            if ($isMultipart) {
+                throw new \RuntimeException('Multipart request tidak berisi file.');
+            }
+
+            if ($rawBody === '') {
+                if ($request->all() !== []) {
+                    throw new \RuntimeException('Request tidak berisi file.');
+                }
+
+                return null;
+            }
+
+            $filename = $request->header('Filename')
+                ?: $this->getFilenameFromRequest($request);
+        }
+
+        if ($rawBody === false || strlen($rawBody) === 0) {
+            throw new \RuntimeException('File kosong.');
+        }
+
+        // Amankan nama file
+        $filename = basename(str_replace('\\', '/', $filename));
+        $filename = preg_replace('/[^A-Za-z0-9._-]/', '_', $filename);
+
+        $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+
+        if (!in_array($extension, ['pdf', 'xml', 'dat'], true)) {
+            throw new \RuntimeException('Format file tidak didukung: ' . $extension);
+        }
+
+        $path = 'ekg-incoming/'
+            . now()->format('Ymd_His')
+            . '_'
+            . Str::random(6)
+            . '_'
+            . $filename;
+
+        $saved = Storage::disk('local')->put($path, $rawBody);
+
+        if (!$saved) {
+            throw new \RuntimeException('Gagal menyimpan file.');
+        }
+
+        return [
+            'rawBody' => $rawBody,
+            'filename' => $filename,
+            'savedPath' => $path,
+        ];
+    }
+
+
+    private function findUploadedFile(array $files)
+    {
+        foreach ($files as $file) {
+            if (is_array($file)) {
+                $found = $this->findUploadedFile($file);
+
+                if ($found) {
+                    return $found;
+                }
+            } elseif ($file instanceof \Illuminate\Http\UploadedFile) {
+                return $file;
+            }
+        }
+
+        return null;
     }
 
     private function xmlResponse(int $code, string $message): \Illuminate\Http\Response
@@ -156,21 +252,36 @@ class EkgReceiveController extends Controller
         return Patient::whereIn('patient_code', $tokens)->value('patient_code');
     }
 
+
     private function parseDat(string $raw, string $guid): ?array
     {
         $text = str_replace("\0", '', $raw);
+
         preg_match_all('/[\x20-\x7E]{2,120}/', $text, $m);
 
-        // string di DAT diawali 1 byte panjang ("$" = 36, "!" = 33, dst), buang byte itu
         $tokens = array_map(function ($t) {
             if (strlen($t) > 1 && ord($t[0]) === strlen($t) - 1) {
                 $t = substr($t, 1);
             }
+
             return trim($t);
         }, $m[0]);
 
-        $idx = array_search(strtoupper($guid), array_map('strtoupper', $tokens), true);
+        Log::info('[DAT] GUID pencarian', [
+            'guid' => $guid,
+            'token_count' => count($tokens),
+            'tokens_sample' => array_slice($tokens, 0, 50),
+        ]);
+
+        $idx = array_search(
+            strtoupper($guid),
+            array_map('strtoupper', $tokens),
+            true
+        );
+
         if ($idx === false) {
+            Log::warning('[DAT] GUID tidak ditemukan dalam token');
+
             return null;
         }
 
@@ -179,12 +290,17 @@ class EkgReceiveController extends Controller
         $ageToken = $tokens[$idx + 3] ?? '';
         $sexToken = $tokens[$idx + 4] ?? '';
 
-        if (!$patientId || !preg_match('/^[A-Za-z0-9\-_\.\/]{1,64}$/', $patientId)) {
+        if (!$patientId || !preg_match('/^[A-Za-z0-9\-_.\/]{1,64}$/', $patientId)) {
             return null;
         }
 
-        $age = preg_match('/^(\d{1,3})Y/', $ageToken, $a) ? (string) ((int) $a[1]) : null;
-        $sex = preg_match('/^([MF])/i', $sexToken, $s) ? strtoupper($s[1]) : null;
+        $age = preg_match('/^(\d{1,3})Y/', $ageToken, $a)
+            ? (string) ((int) $a[1])
+            : null;
+
+        $sex = preg_match('/^([MF])/i', $sexToken, $s)
+            ? strtoupper($s[1])
+            : null;
 
         return [
             'patient_id' => $patientId,
@@ -196,13 +312,25 @@ class EkgReceiveController extends Controller
 
 
 
-    private function routeToHis(string $payloadType, string $rawBody, string $filename, string $savedPath): void
-    {
+
+
+    private function routeToHis(
+        string $payloadType,
+        string $rawBody,
+        string $filename,
+        string $savedPath,
+        Request $request
+    ): void {
+
         $guid = $this->extractGuidFromFilename($filename);
 
         if ($payloadType === 'RAW_PDF') {
+
             $extracted = $this->extractPatientFromPdf($rawBody);
-            Log::info('[PDF] Hasil ekstraksi', ['patient_id' => $extracted['patient_id'] ?? null]);
+
+            Log::info('[PDF] Hasil ekstraksi', [
+                'patient_id' => $extracted['patient_id'] ?? null
+            ]);
 
             if ($guid && $extracted && !empty($extracted['patient_age'])) {
                 Cache::put("ekg_guid_cache:{$guid}", [
@@ -212,46 +340,86 @@ class EkgReceiveController extends Controller
             }
 
             $this->savePdfResult($extracted, $savedPath);
-            $this->attachPendingDat($this->lastPatientCode);
+
 
         } elseif ($payloadType === 'FDA_XML') {
+
             $extracted = $this->extractPatientFromXml($rawBody);
             $xmlToStore = $rawBody;
 
             if ($guid && Cache::has("ekg_guid_cache:{$guid}")) {
+
                 $cached = Cache::get("ekg_guid_cache:{$guid}");
+
                 if (!empty($cached['patient_age'])) {
-                    $xmlToStore = $this->injectAgeToXml($rawBody, $cached['patient_age']);
+                    $xmlToStore = $this->injectAgeToXml(
+                        $rawBody,
+                        $cached['patient_age']
+                    );
                 }
+
                 Cache::forget("ekg_guid_cache:{$guid}");
             }
 
             Storage::disk('local')->put($savedPath, $xmlToStore);
 
             $this->saveXmlResult($extracted, $savedPath);
-            $this->attachPendingDat($this->lastPatientCode);
+
+
 
         } elseif ($payloadType === 'DAT') {
-            $dat = $this->parseDat($rawBody, (string) $guid);
 
-            if ($dat) {
-                Log::info('[DAT] Pasien dari isi file', ['patient_id' => $dat['patient_id']]);
+            // Ambil data pasien dari multipart/form-data
+            $patientId = $request->input('patient_id');
+            $patientName = $request->input('patient_name');
+            $patientSex = $request->input('patient_sex');
+            $patientAge = $request->input('patient_age');
+            $deviceNo = $request->input('device_no');
 
-                $patient = $this->resolvePatient(
-                    $dat['patient_id'],
-                    $dat['patient_name'],
-                    $dat['patient_sex'],
-                    $dat['patient_age']
-                );
-                $this->upsertEkgResult($patient, 'dat_file_path', $savedPath);
-            } else {
-                Log::warning('[DAT] ID pasien tidak terbaca dari isi file, ditahan', ['path' => $savedPath]);
-                $this->holdPendingDat($savedPath);
+            // Jika PatientID tidak dikirim, gunakan hasil Query terakhir
+            if (empty($patientId)) {
+                $patientId = Cache::get('ekg_last_queried_patient_id');
             }
-        } else {
-            Log::warning("Payload type tidak didukung: {$payloadType}");
+
+            Log::info('[DAT] Data pasien dari request/cache', [
+                'patient_id' => $patientId,
+                'patient_name' => $patientName,
+                'patient_sex' => $patientSex,
+                'patient_age' => $patientAge,
+                'device_no' => $deviceNo,
+            ]);
+
+            if (empty($patientId)) {
+                throw new \RuntimeException(
+                    'Patient ID tidak ditemukan pada request maupun cache Query.'
+                );
+            }
+
+            // Cari atau daftarkan pasien
+            $patient = $this->resolvePatient(
+                $patientId,
+                $patientName,
+                $patientSex,
+                $patientAge
+            );
+
+            // Simpan hasil DAT sebagai record baru
+            $this->upsertEkgResult(
+                $patient,
+                'dat_file_path',
+                $savedPath,
+                $deviceNo
+            );
+
+            Log::info('[DAT] Hasil berhasil disimpan', [
+                'patient_id' => $patient->patient_code,
+                'patient_name' => $patientName,
+                'device_no' => $deviceNo,
+                'path' => $savedPath,
+            ]);
         }
     }
+
 
     private function extractPatientFromPdf(string $pdfBytes): ?array
     {
@@ -362,41 +530,63 @@ class EkgReceiveController extends Controller
 
 
 
-    private function resolvePatient(?string $extractedPatientId, ?string $name, ?string $sex, ?string $age, ?string $pacemaker = null): Patient
-    {
+
+    private function resolvePatient(
+        ?string $extractedPatientId,
+        ?string $name,
+        ?string $sex,
+        ?string $age,
+        ?string $pacemaker = null
+    ): Patient {
         $queried = Cache::get('ekg_last_queried_patient_id');
 
-        if ($extractedPatientId) {
-            $patientCode = $extractedPatientId;
-            $source = 'dokumen';
-            $origin = ($queried && $queried === $extractedPatientId) ? 'QUERY' : 'MANUAL';
+        Log::info('[RECEIVE] Cache patient ID:', [
+            'patient_id' => $queried
+        ]);
 
-            // ID di file berbeda dari query terakhir = ini pemeriksaan manual,
-            // cache query lama tidak boleh dipakai lagi
-            if ($queried && $queried !== $extractedPatientId) {
-                Cache::forget('ekg_last_queried_patient_id');
-                Log::info("[PATIENT] ID file ({$extractedPatientId}) berbeda dari query ({$queried}), cache query dibuang");
-            }
-        } elseif ($queried) {
+        // Prioritaskan PatientID dari Query jika tersedia.
+        if ($queried) {
             $patientCode = $queried;
             $source = 'cache-query';
             $origin = 'QUERY';
-            Log::warning("[PATIENT] ID tidak terbaca dari file, PAKAI cache query {$queried}. Cek apakah ini pemeriksaan manual!");
+
+            if ($extractedPatientId && $extractedPatientId !== $queried) {
+                Log::info(
+                    "[PATIENT] ID file ({$extractedPatientId}) berbeda dari Query ({$queried}), tetap menggunakan PatientID Query"
+                );
+            } else {
+                Log::info("[PATIENT] Menggunakan PatientID Query: {$queried}");
+            }
+
+        } elseif ($extractedPatientId) {
+            // Jika belum ada Query, gunakan ID dari dokumen.
+            $patientCode = $extractedPatientId;
+            $source = 'dokumen';
+            $origin = 'MANUAL';
+
         } else {
-            throw new \RuntimeException('Tidak ada patient_id sama sekali, upload dibatalkan');
+            throw new \RuntimeException(
+                'Tidak ada patient_id sama sekali, upload dibatalkan'
+            );
         }
 
         $this->lastOrigin = $origin;
         $this->lastPatientCode = $patientCode;
+
         Log::info("[PATIENT] code={$patientCode} source={$source} origin={$origin}");
 
         $patient = Patient::where('patient_code', $patientCode)->first();
+
         if ($patient) {
             Log::info("[PATIENT] Ditemukan id={$patient->id} origin={$origin}");
             return $patient;
         }
 
-        $genderMap = ['M' => 'Male', 'F' => 'Female'];
+        $genderMap = [
+            'M' => 'Male',
+            'F' => 'Female'
+        ];
+
         $rawSex = strtoupper($sex ?? '');
 
         $patient = Patient::create([
@@ -420,6 +610,7 @@ class EkgReceiveController extends Controller
 
         return $patient;
     }
+
 
     private function savePdfResult(?array $extracted, string $savedPath): void
     {
@@ -451,30 +642,38 @@ class EkgReceiveController extends Controller
     }
 
 
-    private function upsertEkgResult(Patient $patient, string $column, string $path): void
-    {
-        $existing = EkgResult::where('patient_id', $patient->id)
-            ->where('examination_date', '>=', now()->subSeconds(180))
-            ->whereNull($column)
-            ->latest('examination_date')
-            ->first();
+    private function upsertEkgResult(
+        Patient $patient,
+        string $column,
+        string $path,
+        ?string $deviceNo = null
+    ): void {
 
-        if ($existing) {
-            $existing->update([$column => $path]);
-            Log::info("[EKG] Update row id={$existing->id}, kolom={$column}");
-        } else {
-            $created = EkgResult::create([
-                'patient_id' => $patient->id,
-                'origin' => $this->lastOrigin,
-                $column => $path,
-                'examination_date' => now(),
-            ]);
-            Log::info("[EKG] Insert row id={$created->id}, kolom={$column}, origin={$this->lastOrigin}");
+        $fileTypes = [
+            'result_file_path' => 'PDF',
+            'xml_file_path' => 'XML',
+            'dat_file_path' => 'DAT',
+        ];
+
+        if (!isset($fileTypes[$column])) {
+            throw new \InvalidArgumentException(
+                "Kolom file tidak valid: {$column}"
+            );
         }
 
-        if ((int) $patient->isInWorklist !== 2) {
-            $patient->update(['isInWorklist' => 2]);
-            Log::info("[WORKLIST] Pasien id={$patient->id} isInWorklist -> 2 (selesai)");
-        }
+        // Setiap hasil pemeriksaan membuat record baru
+        $created = EkgResult::create([
+            'patient_id' => $patient->id,
+            $column => $path,
+            'result_file_type' => $fileTypes[$column],
+            'device_no' => $deviceNo,
+            'examination_date' => now(),
+        ]);
+
+        Log::info(
+            "[EKG] Insert row id={$created->id}, patient_id={$patient->id}, type={$fileTypes[$column]}"
+        );
     }
+
+
 }

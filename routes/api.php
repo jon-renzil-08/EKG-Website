@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\WorklistController;
 use App\Http\Controllers\EkgQueryController;
+use App\Http\Controllers\EkgReceiveController;
 use App\Http\Controllers\PatientController;
 use App\Models\EkgResult;
 use App\Models\Patient;
@@ -214,7 +215,7 @@ Route::post('/ecg-result', function (Request $request) {
     }
 
     $filename = 'Hasil_EKG_' . now()->format('Ymd_His') . '_' . Str::slug($examName ?? 'ecg') . '_' . Str::random(6) . '.' . $extension;
-    $path = $uploadedFile->storeAs('public/ecg-results-middleware', $filename);
+    $path = $uploadedFile->storeAs('ecg-results-middleware', $filename);
 
     $columnMap = [
         'pdf' => 'result_file_path',
@@ -286,7 +287,7 @@ Route::post('/send-to-simrs', function (Request $request) {
     $deviceNo = $validated['device_no'] ?? null;
 
     $filename = 'Hasil_EKG_' . now()->format('Ymd_His') . '_' . Str::slug('ecg') . '_' . Str::random(6) . '.' . $extension;
-    $path = $uploadedFile->storeAs('public/ecg-results-simrs', $filename);
+    $path = $uploadedFile->storeAs('ecg-results-simrs', $filename);
 
     $columnMap = [
         'pdf' => 'result_file_path',
@@ -338,6 +339,9 @@ Route::post('/send-to-simrs', function (Request $request) {
 
 // Route Dawei EKG Direct Query API
 Route::post('/query', [EkgQueryController::class, 'query']);
+
+// Route Dawei EKG Direct Receive API
+Route::post('/receive', [EkgReceiveController::class, 'receive']);
 
 
 
