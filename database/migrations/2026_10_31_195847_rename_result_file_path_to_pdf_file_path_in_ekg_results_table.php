@@ -4,15 +4,14 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     /**
      * Run the migrations.
      */
     public function up(): void
     {
         Schema::table('ekg_results', function (Blueprint $table) {
-            $table->renameColumn('pdf_file_path', 'pdf_file_path');
+            $table->renameColumn('result_file_path', 'pdf_file_path');
         });
     }
 
@@ -22,7 +21,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('ekg_results', function (Blueprint $table) {
-             $table->renameColumn('pdf_file_path', 'pdf_file_path');
+            $table->renameColumn('pdf_file_path', 'result_file_path');
         });
     }
 };
