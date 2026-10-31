@@ -46,7 +46,7 @@ class EkgControllerTest extends TestCase
     {
         return EkgResult::create([
             'patient_id'       => $patient->id,
-            'result_file_path' => $path,
+            'pdf_file_path' => $path,
             'examination_date' => now(),
         ]);
     }
@@ -154,9 +154,9 @@ class EkgControllerTest extends TestCase
         $row = EkgResult::first();
         $this->assertNotNull($row);
         $this->assertSame($patient->id, $row->patient_id);
-        $this->assertStringStartsWith('ekg_results/', $row->result_file_path);
-        $this->assertStringEndsWith('hasil.pdf', $row->result_file_path);
-        $this->assertTrue(Storage::disk('public')->exists($row->result_file_path));
+        $this->assertStringStartsWith('ekg_results/', $row->pdf_file_path);
+        $this->assertStringEndsWith('hasil.pdf', $row->pdf_file_path);
+        $this->assertTrue(Storage::disk('public')->exists($row->pdf_file_path));
     }
 
     public function test_simpan_ekg_tanpa_data_ditolak(): void

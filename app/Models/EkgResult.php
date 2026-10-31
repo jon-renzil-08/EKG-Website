@@ -13,7 +13,7 @@ class EkgResult extends Model
 
     protected $fillable = [
         'patient_id',
-        'result_file_path',
+        'pdf_file_path',
         'result_file_type',
         'xml_file_path',
         'dat_file_path',
@@ -34,9 +34,9 @@ class EkgResult extends Model
     protected static function booted()
     {
         static::deleting(function ($ekg) {
-            if (Storage::exists($ekg->result_file_path)) {
-                Storage::delete($ekg->result_file_path);
-                Log::info('Deleted EKG file: ' . $ekg->result_file_path);
+            if (Storage::exists($ekg->pdf_file_path)) {
+                Storage::delete($ekg->pdf_file_path);
+                Log::info('Deleted EKG file: ' . $ekg->pdf_file_path);
             }
         });
     }

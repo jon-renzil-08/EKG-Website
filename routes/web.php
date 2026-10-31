@@ -49,7 +49,7 @@ Route::middleware('auth')->group(function () {
         $type = strtolower($type);
 
         $pathMap = [
-            'pdf' => $ekg->result_file_path,
+            'pdf' => $ekg->pdf_file_path,
             'xml' => $ekg->xml_file_path,
             'dat' => $ekg->dat_file_path,
         ];

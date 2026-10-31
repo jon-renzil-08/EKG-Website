@@ -12,7 +12,7 @@ class SimrsResult extends Model
     protected $fillable = [
         'patient_code',
         'device_no',
-        'result_file_path',
+        'pdf_file_path',
         'xml_file_path',
         'dat_file_path',
         'result_file_type',

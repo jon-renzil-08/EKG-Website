@@ -49,7 +49,7 @@ class EkgController extends Controller
 
         EkgResult::create([
             'patient_id' => $request->patient_id,
-            'result_file_path' => $filePath,
+            'pdf_file_path' => $filePath,
             'examination_date' => $request->examination_date,
         ]);
 
@@ -58,8 +58,8 @@ class EkgController extends Controller
 
     public function destroy(EkgResult $ekg)
     {
-        if ($ekg->result_file_path && Storage::disk('public')->exists($ekg->result_file_path)) {
-            Storage::disk('public')->delete($ekg->result_file_path);
+        if ($ekg->pdf_file_path && Storage::disk('public')->exists($ekg->pdf_file_path)) {
+            Storage::disk('public')->delete($ekg->pdf_file_path);
         }
 
         $ekg->delete();

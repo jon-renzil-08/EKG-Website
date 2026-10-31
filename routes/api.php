@@ -96,7 +96,7 @@ Route::middleware('no.browser')->group(function () {
                     'examination_date' => $ekg->examination_date
                         ? $ekg->examination_date->format('Y-m-d H:i:s')
                         : null,
-                    'pdf_url' => $ekg->result_file_path
+                    'pdf_url' => $ekg->pdf_file_path
                         ? url("/ekg/download/{$ekg->id}/pdf")
                         : null,
                     'xml_url' => $ekg->xml_file_path
@@ -218,7 +218,7 @@ Route::post('/ecg-result', function (Request $request) {
     $path = $uploadedFile->storeAs('ecg-results-middleware', $filename);
 
     $columnMap = [
-        'pdf' => 'result_file_path',
+        'pdf' => 'pdf_file_path',
         'xml' => 'xml_file_path',
         'dat' => 'dat_file_path',
     ];
@@ -255,7 +255,7 @@ Route::post('/ecg-result', function (Request $request) {
     $ekgResult->refresh();
     $ekgResult->update([
         'result_file_type' => collect([
-            $ekgResult->result_file_path ? 'PDF' : null,
+            $ekgResult->pdf_file_path ? 'PDF' : null,
             $ekgResult->xml_file_path ? 'XML' : null,
             $ekgResult->dat_file_path ? 'DAT' : null,
         ])->filter()->implode(','),
@@ -290,7 +290,7 @@ Route::post('/send-to-simrs', function (Request $request) {
     $path = $uploadedFile->storeAs('ecg-results-simrs', $filename);
 
     $columnMap = [
-        'pdf' => 'result_file_path',
+        'pdf' => 'pdf_file_path',
         'xml' => 'xml_file_path',
         'dat' => 'dat_file_path',
     ];
@@ -322,7 +322,7 @@ Route::post('/send-to-simrs', function (Request $request) {
     $record->refresh();
     $record->update([
         'result_file_type' => collect([
-            $record->result_file_path ? 'PDF' : null,
+            $record->pdf_file_path ? 'PDF' : null,
             $record->xml_file_path ? 'XML' : null,
             $record->dat_file_path ? 'DAT' : null,
         ])->filter()->implode(','),

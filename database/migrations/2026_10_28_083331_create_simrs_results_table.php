@@ -14,7 +14,7 @@ return new class extends Migration {
             $table->id();
             $table->string('patient_code')->index();
             $table->string('device_no')->nullable();
-            $table->string('result_file_path')->nullable();
+            $table->string('pdf_file_path')->nullable();
             $table->string('xml_file_path')->nullable();
             $table->string('dat_file_path')->nullable();
             $table->string('result_file_type')->nullable();

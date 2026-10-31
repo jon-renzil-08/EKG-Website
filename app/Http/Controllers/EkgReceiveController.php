@@ -324,12 +324,27 @@ class EkgReceiveController extends Controller
 
         $guid = $this->extractGuidFromFilename($filename);
 
+        // Ambil PatientID dan DeviceID dari hasil Query
+        $queriedPatientId = Cache::get('ekg_last_queried_patient_id');
+
+        $deviceNo = $queriedPatientId
+            ? Cache::get("ekg_device_by_patient:{$queriedPatientId}")
+            : null;
+
+        // Jika device_no dikirim langsung melalui request, gunakan sebagai fallback
+        $deviceNo = $deviceNo ?: $request->input('device_no');
+
+        Log::info('[RECEIVE] Device information', [
+            'patient_id' => $queriedPatientId,
+            'device_no' => $deviceNo,
+        ]);
+
         if ($payloadType === 'RAW_PDF') {
 
             $extracted = $this->extractPatientFromPdf($rawBody);
 
             Log::info('[PDF] Hasil ekstraksi', [
-                'patient_id' => $extracted['patient_id'] ?? null
+                'patient_id' => $extracted['patient_id'] ?? null,
             ]);
 
             if ($guid && $extracted && !empty($extracted['patient_age'])) {
@@ -339,8 +354,7 @@ class EkgReceiveController extends Controller
                 ], now()->addMinutes(10));
             }
 
-            $this->savePdfResult($extracted, $savedPath);
-
+            $this->savePdfResult($extracted, $savedPath, $deviceNo);
 
         } elseif ($payloadType === 'FDA_XML') {
 
@@ -363,23 +377,23 @@ class EkgReceiveController extends Controller
 
             Storage::disk('local')->put($savedPath, $xmlToStore);
 
-            $this->saveXmlResult($extracted, $savedPath);
-
-
+            $this->saveXmlResult($extracted, $savedPath, $deviceNo);
 
         } elseif ($payloadType === 'DAT') {
 
-            // Ambil data pasien dari multipart/form-data
             $patientId = $request->input('patient_id');
             $patientName = $request->input('patient_name');
             $patientSex = $request->input('patient_sex');
             $patientAge = $request->input('patient_age');
-            $deviceNo = $request->input('device_no');
 
-            // Jika PatientID tidak dikirim, gunakan hasil Query terakhir
             if (empty($patientId)) {
-                $patientId = Cache::get('ekg_last_queried_patient_id');
+                $patientId = $queriedPatientId;
             }
+
+            // Ambil DeviceID berdasarkan PatientID
+            $deviceNo = Cache::get(
+                "ekg_device_by_patient:{$patientId}"
+            ) ?: $deviceNo;
 
             Log::info('[DAT] Data pasien dari request/cache', [
                 'patient_id' => $patientId,
@@ -395,7 +409,6 @@ class EkgReceiveController extends Controller
                 );
             }
 
-            // Cari atau daftarkan pasien
             $patient = $this->resolvePatient(
                 $patientId,
                 $patientName,
@@ -403,7 +416,6 @@ class EkgReceiveController extends Controller
                 $patientAge
             );
 
-            // Simpan hasil DAT sebagai record baru
             $this->upsertEkgResult(
                 $patient,
                 'dat_file_path',
@@ -612,8 +624,12 @@ class EkgReceiveController extends Controller
     }
 
 
-    private function savePdfResult(?array $extracted, string $savedPath): void
-    {
+    private function savePdfResult(
+        ?array $extracted,
+        string $savedPath,
+        ?string $deviceNo = null
+    ): void {
+
         $patient = $this->resolvePatient(
             $extracted['patient_id'] ?? null,
             $extracted['patient_name'] ?? null,
@@ -621,18 +637,34 @@ class EkgReceiveController extends Controller
             $extracted['patient_age'] ?? null,
             $extracted['patient_pacemaker'] ?? null
         );
-        $this->upsertEkgResult($patient, 'result_file_path', $savedPath);
+
+        $this->upsertEkgResult(
+            $patient,
+            'pdf_file_path',
+            $savedPath,
+            $deviceNo
+        );
     }
 
-    private function saveXmlResult(?array $extracted, string $savedPath): void
-    {
+    private function saveXmlResult(
+        ?array $extracted,
+        string $savedPath,
+        ?string $deviceNo = null
+    ): void {
+
         $patient = $this->resolvePatient(
             $extracted['patient_id'] ?? null,
             $extracted['patient_name'] ?? null,
             $extracted['patient_sex'] ?? null,
             null
         );
-        $this->upsertEkgResult($patient, 'xml_file_path', $savedPath);
+
+        $this->upsertEkgResult(
+            $patient,
+            'xml_file_path',
+            $savedPath,
+            $deviceNo
+        );
     }
 
     private function saveDatResult(?string $patientId, string $savedPath): void
@@ -650,7 +682,7 @@ class EkgReceiveController extends Controller
     ): void {
 
         $fileTypes = [
-            'result_file_path' => 'PDF',
+            'pdf_file_path' => 'PDF',
             'xml_file_path' => 'XML',
             'dat_file_path' => 'DAT',
         ];

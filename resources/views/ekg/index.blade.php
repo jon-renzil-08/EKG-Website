@@ -46,7 +46,7 @@
 
                                             {{-- Kolom tombol download --}}
                                             <td>
-                                                @if ($ekg->result_file_path)
+                                                @if ($ekg->pdf_file_path)
                                                     <a href="{{ route('ekg.download', ['id' => $ekg->id, 'type' => 'pdf']) }}"
                                                         class="btn btn-sm btn-success" target="_blank">
                                                         <i class="fas fa-file-pdf me-1"></i>Download PDF
@@ -67,7 +67,7 @@
                                                     </a>
                                                 @endif
 
-                                                @if (!$ekg->result_file_path && !$ekg->xml_file_path && !$ekg->dat_file_path)
+                                                @if (!$ekg->pdf_file_path && !$ekg->xml_file_path && !$ekg->dat_file_path)
                                                     <span class="text-muted">Belum ada file</span>
                                                 @endif
                                             </td>

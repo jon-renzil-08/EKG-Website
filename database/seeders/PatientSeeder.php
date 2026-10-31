@@ -20,11 +20,11 @@ class PatientSeeder extends Seeder
 
         foreach ($patients as $patientData) {
             $patient = Patient::create($patientData);
-            
+
             // Buat sample EKG result
             EkgResult::create([
                 'patient_id' => $patient->id,
-                'result_file_path' => 'ekg_results/sample_ekg_' . $patient->id . '.pdf',
+                'pdf_file_path' => 'ekg_results/sample_ekg_' . $patient->id . '.pdf',
                 'examination_date' => now()->subDays(rand(1, 30)),
             ]);
         }

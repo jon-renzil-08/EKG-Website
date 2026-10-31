@@ -24,35 +24,61 @@ class EkgQueryController extends Controller
 
         try {
             $patientId = $this->parsePatientIdFromXml($rawXml);
-            Log::info('[QUERY] Diterima', ['patient_id' => $patientId]);
+            $deviceId = $this->parseDeviceIdFromXml($rawXml);
+
+            Log::info('[QUERY] Diterima', [
+                'patient_id' => $patientId,
+                'device_id' => $deviceId,
+            ]);
 
             if (!$patientId) {
                 return $this->errorXmlResponse('Patient not found');
             }
 
-            $patients = Patient::where('isInWorklist', 1)
-                ->where('patient_code', $patientId)
+            $patients = Patient::where('patient_code', $patientId)
+                ->where('isInWorklist', 1)
                 ->get();
 
             if ($patients->isEmpty()) {
-                Log::info('[QUERY] Tidak ada di worklist', ['patient_id' => $patientId]);
+                Log::info('[QUERY] Tidak ada di worklist', [
+                    'patient_id' => $patientId,
+                ]);
+
                 return $this->errorXmlResponse('Patient not found');
             }
 
-            // Fallback terakhir untuk EkgReceiveController kalau ekstraksi file gagal.
-            // Hanya disimpan kalau pasien memang ada di worklist, supaya ID salah ketik
-            // tidak ikut tersimpan.
+            // Simpan PatientID untuk fallback EkgReceiveController
             Cache::forever('ekg_last_queried_patient_id', $patientId);
+
+            // Simpan DeviceID berdasarkan PatientID
+            if ($deviceId !== '') {
+                Cache::forever(
+                    "ekg_device_by_patient:{$patientId}",
+                    $deviceId
+                );
+            }
 
             return $this->worklistXmlResponse($patients);
 
         } catch (\Throwable $e) {
             Log::error('Error in EkgQueryController@query: ' . $e->getMessage());
+
             return response(
                 $this->buildErrorXml($e->getMessage()),
                 500
             )->header('Content-Type', 'application/xml');
         }
+    }
+
+    private function parseDeviceIdFromXml(string $xmlData): string
+    {
+        $xml = simplexml_load_string($xmlData);
+
+        if ($xml === false) {
+            return '';
+        }
+
+        return trim((string) ($xml->DeviceID ?? ''));
     }
 
     private function parsePatientIdFromXml(string $xml): ?string

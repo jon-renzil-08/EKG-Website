@@ -149,9 +149,9 @@ class EkgReceiveTest extends TestCase
 
         $row = EkgResult::where('patient_id', $patient->id)->first();
         $this->assertNotNull($row);
-        $this->assertNotNull($row->result_file_path);
+        $this->assertNotNull($row->pdf_file_path);
         $this->assertSame('QUERY', $row->origin);
-        Storage::disk('local')->assertExists($row->result_file_path);
+        Storage::disk('local')->assertExists($row->pdf_file_path);
     }
 
     // ---------- DAT ----------
