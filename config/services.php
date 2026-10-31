@@ -31,4 +31,11 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
+    'simrs' => [
+        'enable' => env('SIMRS_ENABLE', false),
+        'send_url' => env('SIMRS_SEND_URL'),
+    ],
+
+
+
 ];

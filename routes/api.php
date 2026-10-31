@@ -268,7 +268,7 @@ Route::post('/ecg-result', function (Request $request) {
 });
 
 
-// Route to handle file upload for SIMRS
+// // Route to handle file upload for SIMRS
 Route::post('/send-to-simrs', function (Request $request) {
     $validated = $request->validate([
         'patient_code' => 'required|string|max:255',

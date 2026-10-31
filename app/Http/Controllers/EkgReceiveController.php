@@ -6,6 +6,7 @@ use App\Models\Patient;
 use App\Models\EkgResult;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -314,6 +315,7 @@ class EkgReceiveController extends Controller
 
 
 
+
     private function routeToHis(
         string $payloadType,
         string $rawBody,
@@ -354,7 +356,19 @@ class EkgReceiveController extends Controller
                 ], now()->addMinutes(10));
             }
 
-            $this->savePdfResult($extracted, $savedPath, $deviceNo);
+            $patient = $this->savePdfResult(
+                $extracted,
+                $savedPath,
+                $deviceNo
+            );
+
+            $this->sendToSimrs(
+                $patient->patient_code,
+                $savedPath,
+                $filename,
+                'application/pdf',
+                $deviceNo ?? ''
+            );
 
         } elseif ($payloadType === 'FDA_XML') {
 
@@ -377,7 +391,19 @@ class EkgReceiveController extends Controller
 
             Storage::disk('local')->put($savedPath, $xmlToStore);
 
-            $this->saveXmlResult($extracted, $savedPath, $deviceNo);
+            $patient = $this->saveXmlResult(
+                $extracted,
+                $savedPath,
+                $deviceNo
+            );
+
+            $this->sendToSimrs(
+                $patient->patient_code,
+                $savedPath,
+                $filename,
+                'application/xml',
+                $deviceNo ?? ''
+            );
 
         } elseif ($payloadType === 'DAT') {
 
@@ -423,6 +449,14 @@ class EkgReceiveController extends Controller
                 $deviceNo
             );
 
+            $this->sendToSimrs(
+                $patient->patient_code,
+                $savedPath,
+                $filename,
+                'application/octet-stream',
+                $deviceNo ?? ''
+            );
+
             Log::info('[DAT] Hasil berhasil disimpan', [
                 'patient_id' => $patient->patient_code,
                 'patient_name' => $patientName,
@@ -431,6 +465,72 @@ class EkgReceiveController extends Controller
             ]);
         }
     }
+
+
+
+    private function sendToSimrs(
+        string $patientCode,
+        string $savedPath,
+        string $filename,
+        string $contentType,
+        string $deviceNo = ''
+    ): void {
+
+        $simrs = config('services.simrs');
+
+        if (empty($simrs['enable'])) {
+            Log::info('[SIMRS] Pengiriman dinonaktifkan.');
+            return;
+        }
+
+        $url = $simrs['send_url'] ?? null;
+
+        if (empty($url)) {
+            Log::warning('[SIMRS] SEND_URL kosong, pengiriman dilewati.');
+            return;
+        }
+
+        try {
+            // Membaca file yang sudah tersimpan di storage
+            $fileBytes = Storage::disk('local')->get($savedPath);
+
+            $response = Http::timeout(15)
+                ->acceptJson()
+                ->attach(
+                    'file',
+                    $fileBytes,
+                    $filename,
+                    ['Content-Type' => $contentType]
+                )
+                ->post($url, [
+                    'patient_code' => $patientCode,
+                    'device_no' => $deviceNo,
+                ]);
+
+            if ($response->successful()) {
+                Log::info('[SIMRS] Hasil EKG berhasil dikirim.', [
+                    'patient_code' => $patientCode,
+                    'device_no' => $deviceNo,
+                    'response' => $response->json(),
+                ]);
+            } else {
+                Log::error('[SIMRS] Gagal mengirim hasil EKG.', [
+                    'patient_code' => $patientCode,
+                    'status' => $response->status(),
+                    'response' => $response->body(),
+                ]);
+            }
+
+        } catch (\Throwable $e) {
+            Log::error('[SIMRS] Exception saat pengiriman.', [
+                'patient_code' => $patientCode,
+                'message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+
+
 
 
     private function extractPatientFromPdf(string $pdfBytes): ?array
@@ -628,7 +728,7 @@ class EkgReceiveController extends Controller
         ?array $extracted,
         string $savedPath,
         ?string $deviceNo = null
-    ): void {
+    ): Patient {
 
         $patient = $this->resolvePatient(
             $extracted['patient_id'] ?? null,
@@ -644,13 +744,15 @@ class EkgReceiveController extends Controller
             $savedPath,
             $deviceNo
         );
+
+        return $patient;
     }
 
     private function saveXmlResult(
         ?array $extracted,
         string $savedPath,
         ?string $deviceNo = null
-    ): void {
+    ): Patient {
 
         $patient = $this->resolvePatient(
             $extracted['patient_id'] ?? null,
@@ -665,12 +767,31 @@ class EkgReceiveController extends Controller
             $savedPath,
             $deviceNo
         );
+
+        return $patient;
     }
 
-    private function saveDatResult(?string $patientId, string $savedPath): void
-    {
-        $patient = $this->resolvePatient($patientId, null, null, null);
-        $this->upsertEkgResult($patient, 'dat_file_path', $savedPath);
+    private function saveDatResult(
+        ?string $patientId,
+        string $savedPath,
+        ?string $deviceNo = null
+    ): Patient {
+
+        $patient = $this->resolvePatient(
+            $patientId,
+            null,
+            null,
+            null
+        );
+
+        $this->upsertEkgResult(
+            $patient,
+            'dat_file_path',
+            $savedPath,
+            $deviceNo
+        );
+
+        return $patient;
     }
 
 
