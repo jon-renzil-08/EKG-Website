@@ -173,7 +173,7 @@ Route::post('/ecg-result', function (Request $request) {
 
     $uploadedFile = $request->file('file');
     $extension = strtolower($uploadedFile->getClientOriginalExtension());
-    $allowedExtensions = ['pdf', 'xml', 'dat'];
+    $allowedExtensions = ['pdf', 'xml', 'dat', 'jpg', 'jpeg', 'png'];
 
     if (!$uploadedFile->isValid() || !in_array($extension, $allowedExtensions)) {
         return response()->json(['status' => 'error', 'message' => 'Invalid file type.'], 400);
@@ -221,6 +221,9 @@ Route::post('/ecg-result', function (Request $request) {
         'pdf' => 'pdf_file_path',
         'xml' => 'xml_file_path',
         'dat' => 'dat_file_path',
+        'jpg' => 'image_file_path',
+        'jpeg' => 'image_file_path',
+        'png' => 'image_file_path',
     ];
     $targetColumn = $columnMap[$extension];
 
@@ -258,137 +261,15 @@ Route::post('/ecg-result', function (Request $request) {
             $ekgResult->pdf_file_path ? 'PDF' : null,
             $ekgResult->xml_file_path ? 'XML' : null,
             $ekgResult->dat_file_path ? 'DAT' : null,
+            $ekgResult->image_file_path ? 'IMG' : null,
         ])->filter()->implode(','),
     ]);
 
-    $updated = $patient->update(['isInWorklist' => 2]);
+    $updated = $patient->update(['isInWorklist' => 1]);
     Log::info('Update isInWorklist to 2 (selesai) for patient ' . $patient->patient_code . ': ' . ($updated ? 'success' : 'failed'));
 
     return response()->json(['status' => 'ok', 'message' => 'Result stored', 'filename' => $filename, 'ekg_id' => $ekgResult->id]);
 });
-
-
-// // Route to handle file uploads for ECG results
-// Route::post('/ecg-result', function (Request $request) {
-//     if (!$request->hasFile('file')) {
-//         return response()->json(['status' => 'error', 'message' => 'No file uploaded'], 400);
-//     }
-
-//     $uploadedFile = $request->file('file');
-
-//     // FIX 1: pisahkan pengecekan supaya alasan upload gagal kelihatan
-//     if (!$uploadedFile->isValid()) {
-//         Log::error('ECG upload failed: ' . $uploadedFile->getErrorMessage());
-//         return response()->json([
-//             'status'  => 'error',
-//             'message' => 'Upload failed: ' . $uploadedFile->getErrorMessage(),
-//         ], 400);
-//     }
-
-//     $extension = strtolower($uploadedFile->getClientOriginalExtension());
-//     $allowedExtensions = ['pdf', 'xml', 'dat'];
-
-//     if (!in_array($extension, $allowedExtensions)) {
-//         return response()->json(['status' => 'error', 'message' => 'Invalid file type.'], 400);
-//     }
-
-//     $patientCode = $request->input('patient_id');
-//     if (!$patientCode) {
-//         return response()->json(['status' => 'error', 'message' => 'patient_id is required'], 400);
-//     }
-
-//     $examName = $request->input('exam_name');
-//     $deviceNo = $request->input('device_no');
-//     $patientCode = $request->input('patient_code', $patientCode);
-
-//     $patient = Patient::where('patient_code', $patientCode)->first();
-
-//     if (!$patient) {
-//         $genderMap = ['M' => 'Male', 'F' => 'Female'];
-//         $rawSex = strtoupper($request->input('patient_sex', ''));
-
-//         $patient = Patient::create([
-//             'patient_code' => $patientCode,
-//             'name' => $request->input('patient_name', 'Unknown'),
-//             'gender' => $genderMap[$rawSex] ?? 'Unknown',
-//             'age' => $request->input('patient_age') ?: 0,
-//             'pacemaker' => 'No',
-//             'isInWorklist' => 2,
-//             'source' => 'Outpatient',
-//         ]);
-
-//         Log::info("Auto-registered new patient from manual EKG entry: {$patientCode}");
-//     }
-
-//     $filename = 'Hasil_EKG_' . now()->format('Ymd_His') . '_' . Str::slug($examName ?? 'ecg') . '_' . Str::random(6) . '.' . $extension;
-
-//     // FIX 2: ganti storeAs() (yang memakai getRealPath) dengan Storage::put()
-//     $path = 'public/ecg-results-middleware/' . $filename;
-//     $contents = @file_get_contents($uploadedFile->getPathname());
-
-//     if ($contents === false) {
-//         Log::error('ECG upload: cannot read temp file ' . $uploadedFile->getPathname());
-//         return response()->json([
-//             'status'  => 'error',
-//             'message' => 'Cannot read uploaded temp file (check upload_tmp_dir permission)',
-//         ], 500);
-//     }
-
-//     Storage::put($path, $contents);
-
-//     $columnMap = [
-//         'pdf' => 'result_file_path',
-//         'xml' => 'xml_file_path',
-//         'dat' => 'dat_file_path',
-//     ];
-//     $targetColumn = $columnMap[$extension];
-
-//     $recentWindow = now()->subSeconds(60);
-
-//     $existing = EkgResult::where('patient_id', $patient->id)
-//         ->where('created_at', '>=', $recentWindow)
-//         ->whereNull($targetColumn)
-//         ->latest()
-//         ->first();
-
-//     if ($existing) {
-//         $updateData = [$targetColumn => $path];
-//         // isi device_no kalau masih kosong dan request ini membawa device_no
-//         if ($deviceNo && !$existing->device_no) {
-//             $updateData['device_no'] = $deviceNo;
-//         }
-//         $existing->update($updateData);
-//         $ekgResult = $existing;
-//     } else {
-//         $ekgResult = EkgResult::create([
-//             'patient_id' => $patient->id,
-//             'examination_date' => now(),
-//             'orthanc_instance_id' => $request->input('orthanc_instance_id'),
-//             'device_no' => $deviceNo,
-//             $targetColumn => $path,
-//         ]);
-//     }
-
-//     // result_file_type = daftar format yang ada di record ini, mis. "PDF", "PDF,XML", "PDF,XML,DAT".
-//     $ekgResult->refresh();
-//     $ekgResult->update([
-//         'result_file_type' => collect([
-//             $ekgResult->result_file_path ? 'PDF' : null,
-//             $ekgResult->xml_file_path ? 'XML' : null,
-//             $ekgResult->dat_file_path ? 'DAT' : null,
-//         ])->filter()->implode(','),
-//     ]);
-
-//     $updated = $patient->update(['isInWorklist' => 2]);
-//     Log::info('Update isInWorklist to 2 (selesai) for patient ' . $patient->patient_code . ': ' . ($updated ? 'success' : 'failed'));
-
-//     return response()->json([
-//         'status'   => 'ok',
-//         'message'  => 'Result stored',
-//         'filename' => $filename,
-//         'ekg_id'   => $ekgResult->id,
-//     ]);
-// });
 
 
 // // Route to handle file upload for SIMRS

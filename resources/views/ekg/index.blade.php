@@ -67,7 +67,14 @@
                                                     </a>
                                                 @endif
 
-                                                @if (!$ekg->pdf_file_path && !$ekg->xml_file_path && !$ekg->dat_file_path)
+                                                @if ($ekg->image_file_path)
+                                                    <a href="{{ route('ekg.download', ['id' => $ekg->id, 'type' => 'image']) }}"
+                                                        class="btn btn-sm btn-primary" target="_blank">
+                                                        <i class="fas fa-file-image me-1"></i>Download Image
+                                                    </a>
+                                                @endif
+
+                                                @if (!$ekg->pdf_file_path && !$ekg->xml_file_path && !$ekg->dat_file_path && !$ekg->image_file_path)
                                                     <span class="text-muted">Belum ada file</span>
                                                 @endif
                                             </td>
