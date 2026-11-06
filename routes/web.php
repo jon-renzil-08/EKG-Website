@@ -52,7 +52,7 @@ Route::middleware('auth')->group(function () {
             'pdf' => $ekg->pdf_file_path,
             'xml' => $ekg->xml_file_path,
             'dat' => $ekg->dat_file_path,
-            'image' => 'image_file_path',
+            'image' => $ekg->image_file_path,
         ];
 
         if (!isset($pathMap[$type])) {
@@ -79,6 +79,15 @@ Route::middleware('auth')->group(function () {
         if ($type === 'dat') {
             return response()->download($filePath, "Hasil_EKG_{$patientName}_{$patientId}.dat", [
                 'Content-Type' => 'application/octet-stream'
+            ]);
+        }
+
+        if ($type === 'image') {
+            $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION)) ?: 'jpg';
+            $mime = $ext === 'png' ? 'image/png' : 'image/jpeg';
+
+            return response()->download($filePath, "Hasil_EKG_{$patientName}_{$patientId}.{$ext}", [
+                'Content-Type' => $mime
             ]);
         }
 
