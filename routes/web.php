@@ -83,12 +83,15 @@ Route::middleware('auth')->group(function () {
         }
 
         if ($type === 'image') {
-            $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION)) ?: 'jpg';
+            $enhancedImage = (new \App\Services\EcgImageEnhancer())->enhance($filePath);
+            $ext = strtolower(pathinfo($enhancedImage, PATHINFO_EXTENSION)) ?: 'jpg';
             $mime = $ext === 'png' ? 'image/png' : 'image/jpeg';
 
-            return response()->download($filePath, "Hasil_EKG_{$patientName}_{$patientId}.{$ext}", [
-                'Content-Type' => $mime
-            ]);
+            return response()->download(
+                $enhancedImage,
+                "Hasil_EKG_{$patientName}_{$patientId}.{$ext}",
+                ['Content-Type' => $mime]
+            )->deleteFileAfterSend($enhancedImage !== $filePath);
         }
 
         // PDF (default)
