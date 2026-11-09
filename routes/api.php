@@ -272,80 +272,10 @@ Route::post('/ecg-result', function (Request $request) {
 });
 
 
-// // Route to handle file upload for SIMRS
-Route::post('/send-to-simrs', function (Request $request) {
-    $validated = $request->validate([
-        'patient_code' => 'required|string|max:255',
-        'file' => 'required|file',
-        'device_no' => 'nullable|string|max:255',
-    ]);
-
-    $uploadedFile = $request->file('file');
-    $extension = strtolower($uploadedFile->getClientOriginalExtension());
-
-    if (!in_array($extension, ['pdf', 'xml', 'dat'])) {
-        return response()->json(['status' => 'error', 'message' => 'Invalid file type.'], 400);
-    }
-
-    $patientCode = $validated['patient_code'];
-    $deviceNo = $validated['device_no'] ?? null;
-
-    $filename = 'Hasil_EKG_' . now()->format('Ymd_His') . '_' . Str::slug('ecg') . '_' . Str::random(6) . '.' . $extension;
-    $path = $uploadedFile->storeAs('ecg-results-simrs', $filename);
-
-    $columnMap = [
-        'pdf' => 'pdf_file_path',
-        'xml' => 'xml_file_path',
-        'dat' => 'dat_file_path',
-    ];
-    $targetColumn = $columnMap[$extension];
-
-    // PDF/XML/DAT dari pasien yang sama dalam 60 detik digabung di satu record
-    $existing = SimrsResult::where('patient_code', $patientCode)
-        ->where('created_at', '>=', now()->subSeconds(60))
-        ->whereNull($targetColumn)
-        ->latest()
-        ->first();
-
-    if ($existing) {
-        $updateData = [$targetColumn => $path];
-        if ($deviceNo && !$existing->device_no) {
-            $updateData['device_no'] = $deviceNo;
-        }
-        $existing->update($updateData);
-        $record = $existing;
-    } else {
-        $record = SimrsResult::create([
-            'patient_code' => $patientCode,
-            'device_no' => $deviceNo,
-            'examination_date' => now(),
-            $targetColumn => $path,
-        ]);
-    }
-
-    $record->refresh();
-    $record->update([
-        'result_file_type' => collect([
-            $record->pdf_file_path ? 'PDF' : null,
-            $record->xml_file_path ? 'XML' : null,
-            $record->dat_file_path ? 'DAT' : null,
-        ])->filter()->implode(','),
-    ]);
-
-    return response()->json([
-        'status' => 'ok',
-        'message' => 'Result stored',
-        'filename' => $filename,
-        'ekg_id' => $record->id,
-    ]);
-});
 
 
-// Route Dawei EKG Direct Query API
-Route::post('/query', [EkgQueryController::class, 'query']);
 
-// Route Dawei EKG Direct Receive API
-Route::post('/receive', [EkgReceiveController::class, 'receive']);
+
 
 
 
