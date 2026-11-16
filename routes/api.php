@@ -8,6 +8,7 @@ use App\Models\EkgResult;
 use App\Models\Patient;
 use App\Models\SimrsResult;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
@@ -26,7 +27,6 @@ use Illuminate\Support\Str;
 */
 
 Route::middleware('auth:sanctum')->group(function () {
-
 });
 
 Route::middleware('no.browser')->group(function () {
@@ -62,10 +62,12 @@ Route::middleware('no.browser')->group(function () {
             'code' => 1,
             'data' => $patients->map(function ($p) {
                 return [
+                    'SerialNumber' => (string) $p->patient_code,
                     'PatientID' => (string) $p->patient_code,
                     'PatientName' => $p->name,
                     'PatientSex' => $p->gender === 'Male' ? 'M' : ($p->gender === 'Female' ? 'F' : 'O'),
                     'PatientAge' => (string) $p->age,
+                    'PatientBirthDate' => $p->birth_date ? $p->birth_date->format('Y-m-d') : '',
                     'Pacemaker' => $p->pacemaker === 'Yes' ? 'Yes' : 'No',
                     'Source' => $p->source, // harus: "Inpatient", "Outpatient", atau "Physical Exam"
                     'RequestDate' => $p->created_at ? $p->created_at->format('Y-m-d H:i:s') : null,
@@ -136,25 +138,66 @@ Route::middleware('no.browser')->group(function () {
 });
 
 
-// Routes for create Patient API
+
+
+// Routes for create Patient API No brith_date
+// Route::post('/patients', function (Request $request) {
+//     $validated = $request->validate([
+//         'patient_code' => 'nullable|string|max:255|unique:patients,patient_code',
+//         'name' => 'required|string|max:255',
+//         'age' => 'required|integer|min:1|max:120',
+//         'birth_date' => 'nullable|date|before_or_equal:today',
+//         'gender' => 'required|in:Male,Female,Unknown',
+//         'pacemaker' => 'required|in:Yes,No',
+//         'source' => 'required|in:Inpatient,Outpatient,Physical Exam',
+//     ]);
+
+//     $patient = Patient::create([
+//         'patient_code' => $validated['patient_code'] ?? null,   // kosong → dibuat otomatis P0001...
+//         'name' => $validated['name'],
+//         'age' => $validated['age'],
+//         'birth_date' => $validated['birth_date'] ?? null,
+//         'gender' => $validated['gender'],
+//         'pacemaker' => $validated['pacemaker'],
+//         'source' => $validated['source'],
+//         'isInWorklist' => 1,   // otomatis masuk worklist
+//     ]);
+
+//     return response()->json([
+//         'success' => true,
+//         'message' => 'Pasien berhasil ditambahkan.',
+//         'data' => $patient,
+//     ], 201);
+// });
+
+
+// Routes for create Patient API with birth_date and age calculation
+
 Route::post('/patients', function (Request $request) {
     $validated = $request->validate([
         'patient_code' => 'nullable|string|max:255|unique:patients,patient_code',
         'name' => 'required|string|max:255',
-        'age' => 'required|integer|min:1|max:120',
+        'birth_date' => 'nullable|date|before_or_equal:today',
+        'age' => 'required_without:birth_date|nullable|integer|min:0|max:120',
         'gender' => 'required|in:Male,Female,Unknown',
         'pacemaker' => 'required|in:Yes,No',
         'source' => 'required|in:Inpatient,Outpatient,Physical Exam',
     ]);
 
+    // Kalau birth_date ada, age dihitung dari situ (mengabaikan age kiriman)
+    $age = !empty($validated['birth_date'])
+        ? Carbon::parse($validated['birth_date'])->age
+        : $validated['age'];
+
     $patient = Patient::create([
-        'patient_code' => $validated['patient_code'] ?? null,   // kosong → dibuat otomatis P0001...
+        'patient_code' => $validated['patient_code'] ?? null,
         'name' => $validated['name'],
-        'age' => $validated['age'],
+        'age' => $age,
+        'birth_date' => $validated['birth_date'] ?? null,
         'gender' => $validated['gender'],
         'pacemaker' => $validated['pacemaker'],
         'source' => $validated['source'],
-        'isInWorklist' => 1,   // otomatis masuk worklist
+        'isInWorklist' => 1,
     ]);
 
     return response()->json([
@@ -166,6 +209,7 @@ Route::post('/patients', function (Request $request) {
 
 
 // Route to handle file uploads for ECG results
+
 Route::post('/ecg-result', function (Request $request) {
     if (!$request->hasFile('file')) {
         return response()->json(['status' => 'error', 'message' => 'No file uploaded'], 400);
@@ -270,6 +314,12 @@ Route::post('/ecg-result', function (Request $request) {
 
     return response()->json(['status' => 'ok', 'message' => 'Result stored', 'filename' => $filename, 'ekg_id' => $ekgResult->id]);
 });
+
+
+
+
+
+
 
 
 

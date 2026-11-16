@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Patient;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class PatientController extends Controller
 {
@@ -34,7 +35,8 @@ class PatientController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'age' => 'required|integer|min:1|max:120',
+            'age' => 'required_without:birth_date|nullable|integer|min:0|max:120',
+            'birth_date' => 'nullable|date|before:today',
             'gender' => 'required|in:Male,Female,Unknown',
             'pacemaker' => 'required|in:Yes,No',
             'source' => 'required|in:Inpatient,Outpatient,Physical Exam'
@@ -42,7 +44,10 @@ class PatientController extends Controller
 
         Patient::create([
             'name' => $request['name'],
-            'age' => $request['age'],
+            'age' => $request->filled('birth_date')
+                ? Carbon::parse($request['birth_date'])->age
+                : $request['age'],
+            'birth_date' => $request['birth_date'],
             'gender' => $request['gender'],
             'pacemaker' => $request['pacemaker'],
             'source' => $request['source'],
