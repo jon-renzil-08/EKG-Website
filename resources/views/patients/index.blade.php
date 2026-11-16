@@ -32,6 +32,7 @@
                                 <thead>
                                     <tr>
                                         <th style="font-weight: bold; color: black;">No</th>
+                                        <th style="font-weight: bold; color: black;">QR Code</th>
                                         <th style="font-weight: bold; color: black;">ID</th>
                                         <th style="font-weight: bold; color: black;">Name</th>
                                         <th style="font-weight: bold; color: black;">Age</th>
@@ -47,7 +48,12 @@
                                         <tr class="patient-row">
                                             <td>{{ ($patients->currentPage() - 1) * $patients->perPage() + $loop->iteration }}
                                             </td>
-                                            {{-- <td style="font-weight: bold;">{{ $patient->patient_code }}</td> --}}
+                                            <td>
+                                                <button type="button" class="qr-cell" title="Klik untuk memperbesar"
+                                                    data-qr-name="{{$patient->patient_code }} - {{$patient->name }}">
+                                                    {!! $patient->qr_svg !!}
+                                                </button>
+                                            </td>
 
                                             <td style="font-weight: bold; color: black;">
                                                 {{ $patient->patient_code }}
@@ -83,11 +89,11 @@
                                             <td class="text-nowrap">
                                                 <div class="d-flex align-items-center gap-1">
                                                     {{-- @if ($patient->isInWorklist === 0)
-                                                        <button class="btn btn-sm btn-primary send-to-worklist pulse-btn"
-                                                            data-id="{{ $patient->id }}">
-                                                            <i class="fas fa-heartbeat me-1"></i>
-                                                            Kirim EKG
-                                                        </button>
+                                                    <button class="btn btn-sm btn-primary send-to-worklist pulse-btn"
+                                                        data-id="{{ $patient->id }}">
+                                                        <i class="fas fa-heartbeat me-1"></i>
+                                                        Kirim EKG
+                                                    </button>
                                                     @endif --}}
 
                                                     <a href="{{ route('patients.edit', $patient) }}"
@@ -102,8 +108,8 @@
                                                     </button>
 
                                                     <form id="delete-form-{{ $patient->id }}"
-                                                        action="{{ route('patients.destroy', $patient->id) }}"
-                                                        method="POST" style="display:none;">
+                                                        action="{{ route('patients.destroy', $patient->id) }}" method="POST"
+                                                        style="display:none;">
                                                         @csrf
                                                         @method('DELETE')
                                                     </form>
@@ -153,6 +159,15 @@
                 </div>
             </div>
         </div>
+
+        {{-- QR Code Modal --}}
+        <div id="qrModal" class="qr-modal" hidden>
+            <div class="qr-modal__box" role="dialog" aria-modal="true">
+                <button type="button" class="qr-modal__close" aria-label="Tutup">&times;</button>
+                <div id="qrModalBody" class="qr-modal__body"></div>
+                <div id="qrModalTitle" class="qr-modal__title"></div>
+            </div>
+        </div>
     </div>
 
     @include('script.delete')
@@ -160,18 +175,20 @@
 
     <script>
         // Enable tooltips on all elements with data-bs-toggle="tooltip"
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-            tooltipTriggerList.forEach(function(tooltipTriggerEl) {
+            tooltipTriggerList.forEach(function (tooltipTriggerEl) {
                 new bootstrap.Tooltip(tooltipTriggerEl)
             })
         })
     </script>
+
+
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             // Tooltip Bootstrap
             var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-            tooltipTriggerList.forEach(function(tooltipTriggerEl) {
+            tooltipTriggerList.forEach(function (tooltipTriggerEl) {
                 new bootstrap.Tooltip(tooltipTriggerEl)
             })
 
@@ -193,8 +210,8 @@
             }
 
             // Handler untuk tombol kirim
-            document.querySelectorAll('.send-to-worklist').forEach(function(button) {
-                button.addEventListener('click', function() {
+            document.querySelectorAll('.send-to-worklist').forEach(function (button) {
+                button.addEventListener('click', function () {
                     const patientId = this.getAttribute('data-id');
                     const btn = this;
 
@@ -205,20 +222,20 @@
                     btn.classList.remove('pulse-btn');
                     btn.disabled = true;
                     btn.innerHTML = `
-                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
-                Mengirim...
-            `;
+                                        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                        Mengirim...
+                                    `;
 
                     fetch(`/api/send-to-worklist/${patientId}`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                            },
-                            body: JSON.stringify({
-                                id: patientId
-                            })
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                        },
+                        body: JSON.stringify({
+                            id: patientId
                         })
+                    })
                         .then(response => response.json())
                         .then(data => {
                             // Kembalikan button ke semula
@@ -244,5 +261,34 @@
                 });
             });
         });
+    </script>
+
+    {{-- QR Modal Script --}}
+    <script>
+        (function () {
+            const modal = document.getElementById('qrModal');
+            const body = document.getElementById('qrModalBody');
+            const title = document.getElementById('qrModalTitle');
+
+            function openModal(btn) {
+                body.innerHTML = btn.innerHTML;          // salin SVG QR
+                title.textContent = btn.dataset.qrName || '';
+                modal.hidden = false;
+            }
+            function closeModal() {
+                modal.hidden = true;
+                body.innerHTML = '';
+            }
+
+            document.addEventListener('click', function (e) {
+                const btn = e.target.closest('.qr-cell');
+                if (btn) return openModal(btn);
+                // klik area gelap atau tombol X menutup modal
+                if (e.target === modal || e.target.closest('.qr-modal__close')) closeModal();
+            });
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && !modal.hidden) closeModal();
+            });
+        })();
     </script>
 @endsection

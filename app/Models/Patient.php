@@ -1,9 +1,15 @@
 <?php
 namespace App\Models;
 
+use BaconQrCode\Renderer\Image\SvgImageBackEnd;
+use BaconQrCode\Renderer\ImageRenderer;
+use BaconQrCode\Renderer\RendererStyle\RendererStyle;
+use BaconQrCode\Writer;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Cache;
+
 
 class Patient extends Model
 {
@@ -129,5 +135,33 @@ class Patient extends Model
     public function ekgResults()
     {
         return $this->hasMany(EkgResult::class);
+    }
+
+    public function getQrPayloadAttribute()
+    {
+        // kode, nama, umur, tinggi, jenis kelamin (dipisah tab)
+        return implode("\t", [
+            $this->patient_code,
+            $this->name,
+            $this->age,
+            $this->height,
+            $this->gender,
+        ]);
+    }
+
+    public function getQrSvgAttribute(): string
+    {
+        return Cache::rememberForever('patient_qr_v1_' . md5($this->qr_payload), function () {
+            $renderer = new ImageRenderer(
+                new RendererStyle(200, 1),
+                new SvgImageBackEnd()
+            );
+            $svg = trim((new Writer($renderer))->writeString($this->qr_payload));
+
+            // Buang deklarasi XML supaya aman dipakai inline di HTML
+            $svg = preg_replace('/^<\?xml[^>]*\?>\s*/', '', $svg);
+
+            return $svg;
+        });
     }
 }

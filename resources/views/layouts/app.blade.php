@@ -482,6 +482,65 @@
         .logout-button:hover {
             background: #b91c1c;
         }
+
+        .qr-cell {
+            padding: 0;
+            border: 0;
+            background: none;
+            cursor: zoom-in;
+        }
+
+        .qr-cell svg {
+            width: 90px;
+            height: 90px;
+            display: block;
+            background: #fff;
+        }
+
+        .qr-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, .55);
+        }
+
+        .qr-modal[hidden] {
+            display: none;
+        }
+
+        .qr-modal__box {
+            position: relative;
+            background: #fff;
+            padding: 24px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, .3);
+        }
+
+        .qr-modal__body svg {
+            width: min(70vw, 360px);
+            height: min(70vw, 360px);
+            display: block;
+        }
+
+        .qr-modal__title {
+            margin-top: 12px;
+            font-weight: 600;
+        }
+
+        .qr-modal__close {
+            position: absolute;
+            top: 6px;
+            right: 10px;
+            border: 0;
+            background: none;
+            font-size: 26px;
+            line-height: 1;
+            cursor: pointer;
+        }
     </style>
 
 </head>
