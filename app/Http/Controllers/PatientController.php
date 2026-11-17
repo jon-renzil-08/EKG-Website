@@ -71,11 +71,17 @@ class PatientController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:255',
-            'age' => 'required|integer|min:1|max:120',
+            'age' => 'required_without:birth_date|nullable|integer|min:0|max:120',
+            'birth_date' => 'nullable|date|before:today',
             'gender' => 'required|in:Male,Female,Unknown',
             'pacemaker' => 'required|in:Yes,No',
             'source' => 'required|in:Inpatient,Outpatient,Physical Exam'
         ]);
+
+        // Calculate age from birth_date if provided, otherwise use the age input
+        if ($request->filled('birth_date')) {
+            $request->merge(['age' => Carbon::parse($request['birth_date'])->age]);
+        }
 
         $patient->update($request->all());
         return redirect()->route('patients.index')->with('success', 'Patient updated successfully');
