@@ -14,6 +14,8 @@ return new class extends Migration
             $table->string('pdf_file_path')->nullable();
             $table->string('xml_file_path')->nullable();
             $table->string('dat_file_path')->nullable();
+            $table->string('image_file_path')->nullable();
+            $table->string('device_no')->nullable();
             $table->string('result_file_type')->nullable();
             $table->string('orthanc_instance_id')->nullable();
             $table->timestamp('examination_date');
